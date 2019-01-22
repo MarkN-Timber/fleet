@@ -1,0 +1,315 @@
+﻿Option Explicit
+
+Dim WithEvents xlApp As Application
+Dim intConfirmMsg As Integer
+
+'ツールブックアクティブ時
+Private Sub Workbook_Activate()
+    Dim blnVisibleFlg As Boolean
+    '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    Dim myClipBoard As Variant
+    Dim myData As New DataObject
+    Dim myTxt As String
+
+    On Error GoTo Error
+    
+    '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    '明細書印刷画面ではコピペを可能とする。
+    If blnMoushikomiflg Then
+        myClipBoard = Application.ClipboardFormats
+        If myClipBoard(1) = xlClipboardFormatText Then
+            myData.GetFromClipboard
+            myTxt = myData.GetText
+        End If
+    End If
+    
+    'ショートカットキーの無効
+    Call subShortCutKey(1)
+
+    If ThisWorkbook.ActiveSheet.Name = "明細入力" Then
+        Application.ExecuteExcel4Macro "SHOW.TOOLBAR(""Ribbon"",False)"
+    End If
+    '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    If ThisWorkbook.ActiveSheet.Name = "明細入力（ノンフリート）" Then
+        Application.ExecuteExcel4Macro "SHOW.TOOLBAR(""Ribbon"",False)"
+    End If
+    If ThisWorkbook.ActiveSheet.Name = "明細書印刷" Then
+        Application.ExecuteExcel4Macro "SHOW.TOOLBAR(""Ribbon"",False)"
+    End If
+    If ThisWorkbook.ActiveSheet.Name = "明細書印刷（ノンフリート）" Then
+        Application.ExecuteExcel4Macro "SHOW.TOOLBAR(""Ribbon"",False)"
+    End If
+
+    Application.DisplayStatusBar = False
+    Application.DisplayFormulaBar = False
+    Application.CommandBars("Ply").Enabled = False
+    
+    '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    '明細書印刷画面ではコピペを可能とする。
+    If blnMoushikomiflg Then
+        If myTxt <> "" Then
+            myData.SetText myTxt
+            myData.PutInClipboard
+        End If
+    End If
+    
+    On Error GoTo 0
+    
+    Exit Sub
+
+Error:
+    MsgBox "Workbook_Activate" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+
+End Sub
+
+'ツールブックディアクティブ時
+Private Sub Workbook_Deactivate()
+    Dim blnVisibleFlg As Boolean
+
+    On Error GoTo Error
+    
+    'ショートカットキーの有効
+    Call subShortCutKey(2)
+    
+    Application.ExecuteExcel4Macro "SHOW.TOOLBAR(""Ribbon"",True)"
+    Application.DisplayStatusBar = True
+    Application.DisplayFormulaBar = True
+    Application.CommandBars("Ply").Enabled = True
+    
+    On Error GoTo 0
+    
+    Exit Sub
+    
+Error:
+    MsgBox "Workbook_Deactivate" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+
+End Sub
+
+'ツールオープン時
+Private Sub Workbook_Open()
+    
+    On Error GoTo Error
+    Set xlApp = Application
+    
+    Call subBookUnProtect           'ブックの保護を解除
+    Call subMeisaiProtect           'シートの保護を解除
+    Call subSheetVisible(False)     'シート・ブックの非表示
+    Call subBookProtect             'ブックの保護
+    
+    '自動バックアップ機能を禁止
+    ThisWorkbook.EnableAutoRecover = False
+    'ブックの×ボタンを無効にフラグを設定
+    blnCloseFlg = False
+    
+    Call subMeisaiUnProtect     'シートの保護の解除
+    Call subMeisaiPrtUnProtect  'シートの保護の解除 2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    Call subCmbInitialize       '計算用シートのコンボボックスを設定（明細入力シート、明細入力（ノンフリート）シート両方を設定）
+    Call subMeisaiProtect       'シートの保護
+    Call subMeisaiPrtProtect    'シートの保護 2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    
+    
+    'TOP画面を表示
+    Set frmTop = New frmTop
+    frmTop.Show vbModeless
+    
+    On Error GoTo 0
+    
+    Exit Sub
+    
+Error:
+    MsgBox "Workbook_Open" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+    
+End Sub
+
+'別のブックが開かれた場合、シートの非表示のみに変更
+Private Sub xlApp_WorkbookOpen(ByVal WB As Workbook)
+    If Not WB Is ThisWorkbook Then
+        Dim USF As UserForm
+        
+        For Each USF In UserForms
+            If TypeOf USF Is frmTop Then
+                If frmTop.Visible Then
+                    Call subSheetVisible(False)     'シート・ブックの非表示
+                End If
+            End If
+            If TypeOf USF Is frmKyoutsuu Then
+                If frmKyoutsuu.Visible Then
+                    Call subSheetVisible(False)     'シート・ブックの非表示
+                End If
+            End If
+            If TypeOf USF Is frmOtherrate Then
+                If frmOtherrate.Visible Then
+                    Call subSheetVisible(False)     'シート・ブックの非表示
+                End If
+            End If
+            If TypeOf USF Is frmSyaryou Then
+                If frmSyaryou.Visible Then
+                    Call subSheetVisible(False)     'シート・ブックの非表示
+                End If
+            End If
+            If TypeOf USF Is frmHosyoSet Then
+                If frmHosyoSet.Visible Then
+                    Call subSheetVisible(False)     'シート・ブックの非表示
+                End If
+            End If
+            If TypeOf USF Is frmPrintMenu Then
+                If frmPrintMenu.Visible Then
+                    Call subSheetVisible(False)     'シート・ブックの非表示
+                End If
+            End If
+            If TypeOf USF Is frmEntryMitsumori Then
+                If frmEntryMitsumori.Visible Then
+                    Call subSheetVisible(False)     'シート・ブックの非表示
+                End If
+            End If
+            If TypeOf USF Is frmEntryMoushikomi Then
+                If frmEntryMoushikomi.Visible Then
+                    Call subSheetVisible(False)     'シート・ブックの非表示
+                End If
+            End If
+        Next
+    End If
+    
+    Set WB = Nothing
+    
+End Sub
+
+Private Sub xlApp_WorkbookBeforeClose(ByVal WB As Workbook, Cancel As Boolean)
+    Application.OnTime Now, "subOtherClose"
+    Set WB = Nothing
+End Sub
+
+Private Sub Worksheet_BeforeRightClick(ByVal Target As Range, Cancel As Boolean)
+    Target.Value = Not Target.Value
+End Sub
+
+'管理者機能
+Private Sub Workbook_BeforeSave(ByVal SaveAsUI As Boolean, Cancel As Boolean)
+
+    On Error GoTo Error
+    
+    If blnSaveFlg Then
+        blnSaveFlg = False
+        Cancel = False
+    Else
+        MsgBox "保存はできません"
+        Cancel = True
+    End If
+
+    On Error GoTo 0
+    
+    Exit Sub
+    
+Error:
+    MsgBox "Workbook_BeforeSave" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+
+End Sub
+
+Private Sub Workbook_BeforeClose(Cancel As Boolean)
+    Dim wsSetting As Worksheet          '各種設定ワークシート
+    
+    On Error GoTo Error
+    
+    Call subSetSheet(5, wsSetting)      'シートオブジェクト(別紙　各種設定)
+    
+    If CBool(wsSetting.Range("P1")) Then
+        Application.ExecuteExcel4Macro "SHOW.TOOLBAR(""Ribbon"",True)"
+        Application.DisplayStatusBar = True
+        Application.DisplayFormulaBar = True
+        
+        'ショートカットキーの有効
+        Call subShortCutKey(2)
+        
+        Application.DisplayAlerts = False
+        ThisWorkbook.Saved = True
+        Cancel = False
+    Else
+        If wsSetting.Visible Then
+            intConfirmMsg = MsgBox("編集内容を保存してからツールを終了します。" & vbCrLf & "よろしいですか?", vbYesNoCancel, "確認ダイアログ")
+        Else
+            intConfirmMsg = MsgBox("ツールを終了します。" & vbCrLf & "よろしいですか?" & vbCrLf & "※入力内容は保存されません。", vbYesNo, "確認ダイアログ")
+        End If
+        If intConfirmMsg = 6 Then
+            If wsSetting.Visible Then
+                Call subBookUnProtect           'ブックの保護を解除
+        
+                Application.OnKey "%{q}", ""
+                ThisWorkbook.Worksheets("明細入力").Visible = True
+                ThisWorkbook.Worksheets("別紙　コード値").Visible = False
+                ThisWorkbook.Worksheets("別紙　各種設定").Visible = False
+                ThisWorkbook.Worksheets("見積書").Visible = False
+                ThisWorkbook.Worksheets("車両明細書").Visible = False
+                ThisWorkbook.Worksheets("契約申込書1枚目").Visible = False
+                ThisWorkbook.Worksheets("契約申込書2枚目").Visible = False
+                ThisWorkbook.Worksheets("明細書").Visible = False
+                ThisWorkbook.Worksheets("申込書ＥＤＰ").Visible = False
+                ThisWorkbook.Worksheets("明細書ＥＤＰ").Visible = False
+                ThisWorkbook.Worksheets("別紙　見積書設定").Visible = False
+                ThisWorkbook.Worksheets("別紙　車両明細書設定").Visible = False
+                ThisWorkbook.Worksheets("別紙　申込書(1枚目)設定").Visible = False
+                ThisWorkbook.Worksheets("別紙　申込書(2枚目)設定").Visible = False
+                ThisWorkbook.Worksheets("別紙　明細書設定").Visible = False
+                ThisWorkbook.Worksheets("別紙　申込書ＥＤＰ設定").Visible = False
+                ThisWorkbook.Worksheets("別紙　明細書ＥＤＰ設定").Visible = False
+                '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+                ThisWorkbook.Worksheets("明細入力（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("明細書印刷").Visible = False
+                ThisWorkbook.Worksheets("明細書印刷（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("別紙　コード値（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("見積書（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("車両明細書（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("明細書（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("申込書ＥＤＰ（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("明細書ＥＤＰ（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("別紙　見積書設定（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("別紙　車両明細書設定（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("別紙　申込書(1枚目)設定（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("別紙　申込書(2枚目)設定（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("別紙　明細書設定（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("別紙　申込書ＥＤＰ設定（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("別紙　明細書ＥＤＰ設定（ノンフリート）").Visible = False
+                ThisWorkbook.Worksheets("テキスト内容(共通)").Visible = False
+                ThisWorkbook.Worksheets("テキスト内容(明細)").Visible = False
+                
+                'ブックの保存
+                blnSaveFlg = True
+                ThisWorkbook.Save
+                
+                Call subBookProtect             'ブックの保護
+            End If
+            Cancel = True
+            
+            Application.DisplayAlerts = False
+            Call subAppClose
+        ElseIf intConfirmMsg = 7 And wsSetting.Visible Then
+            Cancel = True
+            
+            Application.DisplayAlerts = False
+            Call subAppClose
+        Else
+            Application.DisplayAlerts = False
+            Cancel = True
+            Application.DisplayAlerts = True
+        End If
+    End If
+    
+    Set wsSetting = Nothing
+    
+    On Error GoTo 0
+    
+    Exit Sub
+    
+Error:
+    MsgBox "Workbook_BeforeClose" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+    
+End Sub

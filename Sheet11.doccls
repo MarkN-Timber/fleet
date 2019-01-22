@@ -1,0 +1,973 @@
+﻿Option Explicit
+
+'ダウンロードボタン押下
+Private Sub btnDl_Click()
+
+    Dim intStrartRow As Integer
+
+    Dim wsSetting As Worksheet
+    Dim wsKyoutsu As Worksheet
+    Dim wsMeisai As Worksheet
+    Dim wsMeisaiPrint As Worksheet
+    
+    Dim strOuptutPath As String
+    Dim intConfirmMsg As Integer
+    Dim strFilePath As String
+    Dim strFileName As String
+    Dim strFileFullPath As String
+    
+    Dim intAllCell As String
+    Dim i As Integer
+    Dim strOutKyo As String
+    Dim blnOutFlg As Boolean
+    Dim strOutMei As String
+    Dim strOutMeiArray() As String
+    Dim varOutMeiTmp As Variant
+    Dim strOutMeiTmp As String
+    Dim strOutMeiResult As String
+    Dim strOutput As String
+    Dim intFileNumber As Integer
+    Dim intFileMaxCar   As Integer
+    Dim intFileNo As Integer
+
+    intStrartRow = 6
+    
+    Call subSetSheet(5, wsSetting)      'シートオブジェクト(別紙　各種設定)
+    Call subSetSheet(6, wsKyoutsu)      'シートオブジェクト(テキスト内容(共通))
+    Call subSetSheet(7, wsMeisai)       'シートオブジェクト(テキスト内容(明細))
+    Call subSetSheet(18, wsMeisaiPrint) 'シートオブジェクト(明細書印刷)
+    
+    
+    '総付保台数取得
+    intAllCell = Val(wsKyoutsu.Cells(1, 19).Value)
+    
+    'ファイル総付保台数取得
+    intFileMaxCar = Val(wsSetting.Range("B3").Value)
+    
+    '出力ファイルパス取得
+    strOuptutPath = wsSetting.Range("B5").Value
+    
+    '出力ファイル名
+    strFileName = Format(Now(), "YYYYMMDDhhmm")
+    
+    'エラーチェック
+    If fncErrCheck(wsMeisaiPrint, wsKyoutsu.Cells(1, 19).Value) <> "" Then
+        Exit Sub
+    End If
+    
+    'ダウンロードメッセージボックス
+    intConfirmMsg = MsgBox("ダウンロードします。よろしいですか。", vbYesNo, "確認ダイアログ")
+    If intConfirmMsg = 7 Then
+    Else
+    
+        '出力ファイルパス
+        If strOuptutPath = "" Then
+            strFilePath = CreateObject("WScript.Shell").SpecialFolders.item("Desktop") & "\"
+        Else
+            strFilePath = strOuptutPath & "\"
+        End If
+        
+        
+        If intAllCell < (intFileMaxCar + 1) Then
+        '明細が49件以下の場合
+        
+            '出力ファイル上書きチェック
+            strFileName = Format(Now(), "YYYYMMDDhhmm")
+            strFileFullPath = strFilePath & strFileName & ".txt"
+            
+            '同名ファイル確認
+            If Dir(strFileFullPath) <> "" Then
+                intConfirmMsg = MsgBox("同じ名前のファイルが存在します。上書きしますか？", vbYesNo, "確認ダイアログ")
+                If intConfirmMsg = 7 Then Exit Sub
+            End If
+            
+            
+        
+            '共通情報レコード（1行目）取得
+            blnChouhyouflg = True
+            intAllCell = wsKyoutsu.Range("S1").Value
+            strOutKyo = fncTempSave_Kyotsu(intAllCell)
+            blnChouhyouflg = False
+        
+            '明細情報レコード（2行目）取得
+            blnOutFlg = False
+            For i = 1 To Val(intAllCell)
+            
+                'ダウンロードデータの明細行を取得
+                strOutMei = fncTempSave_Meisai(i, strOutMei, blnOutFlg, True)
+                
+                '画面入力内容をダウンロードデータの明細行に反映
+                strOutMeiArray = Split(strOutMei, ",")
+                strOutMeiArray(68) = fncTrimComma(Trim(wsMeisaiPrint.Cells(intStrartRow + i, 3))) '登録番号（漢字）
+                strOutMeiArray(71) = fncTrimComma(Trim(wsMeisaiPrint.Cells(intStrartRow + i, 4))) '登録番号（カナ）
+                strOutMeiArray(69) = fncTrimComma(Trim(wsMeisaiPrint.Cells(intStrartRow + i, 5))) '車台番号
+                
+                '車検満了日
+                If fncWarekiCheck(fncTrimComma(Trim(wsMeisaiPrint.Cells(intStrartRow + i, 6)))) = "" Then
+                    strOutMeiArray(70) = fncToSeireki(fncTrimComma(Trim(wsMeisaiPrint.Cells(intStrartRow + i, 6))), 8)
+                End If
+                
+                'CSV形式に変換
+                strOutMeiTmp = ""
+                For Each varOutMeiTmp In strOutMeiArray
+                    If strOutMeiTmp <> "" Then
+                        strOutMeiTmp = strOutMeiTmp & ","
+                    End If
+                    strOutMeiTmp = strOutMeiTmp & varOutMeiTmp
+                Next varOutMeiTmp
+                strOutMeiResult = strOutMeiResult & strOutMeiTmp '& vbCrLf '改行コード
+                
+                blnOutFlg = True
+            Next
+            
+            '1行目＋2行目を結合
+            strOutput = strOutKyo & Left(strOutMeiResult, Len(strOutMeiResult) - 2)
+            
+            
+            '出力
+            intFileNumber = FreeFile
+            Open strFileFullPath For Output As #intFileNumber
+                Print #intFileNumber, strOutput;
+            Close #intFileNumber
+            
+            
+        Else
+        '明細が50件以上の場合
+        
+            intFileNo = 1
+            
+            strFileFullPath = strFilePath & strFileName & "_" & Format(intFileNo, "00") & ".txt"
+
+            '同名ファイル確認
+            If Dir(strFileFullPath) <> "" Then
+                intConfirmMsg = MsgBox("同じ名前のファイルが既に存在します。上書きしますか？", vbYesNo, "確認ダイアログ")
+                If intConfirmMsg = 7 Then Exit Sub
+            End If
+            
+            
+            blnOutFlg = False
+            For i = 1 To intAllCell
+            
+                '明細情報レコード（2行目）取得
+                strOutMei = fncTempSave_Meisai(i, strOutMei, blnOutFlg, True)
+                
+                '画面入力内容をダウンロードデータの明細行に反映
+                strOutMeiArray = Split(strOutMei, ",")
+                strOutMeiArray(68) = fncTrimComma(Trim(wsMeisaiPrint.Cells(intStrartRow + i, 3))) '登録番号（漢字）
+                strOutMeiArray(71) = fncTrimComma(Trim(wsMeisaiPrint.Cells(intStrartRow + i, 4))) '登録番号（カナ）
+                strOutMeiArray(69) = fncTrimComma(Trim(wsMeisaiPrint.Cells(intStrartRow + i, 5))) '車台番号
+                
+                '車検満了日
+                If fncWarekiCheck(fncTrimComma(Trim(wsMeisaiPrint.Cells(intStrartRow + i, 6)))) = "" Then
+                    strOutMeiArray(70) = fncToSeireki(fncTrimComma(Trim(wsMeisaiPrint.Cells(intStrartRow + i, 6))), 8)
+                End If
+                
+                'CSV形式に変換
+                strOutMeiTmp = ""
+                For Each varOutMeiTmp In strOutMeiArray
+                    If strOutMeiTmp <> "" Then
+                        strOutMeiTmp = strOutMeiTmp & ","
+                    End If
+                    strOutMeiTmp = strOutMeiTmp & varOutMeiTmp
+                Next varOutMeiTmp
+                strOutMeiResult = strOutMeiResult & strOutMeiTmp '& vbCrLf '改行コード
+    
+                If i Mod intFileMaxCar = 0 Or i = intAllCell Then
+                    '共通情報レコード（1行目）取得
+                    strOutKyo = fncTempSave_Kyotsu(IIf(i Mod intFileMaxCar = 0, intFileMaxCar, i Mod intFileMaxCar))
+                
+                    '1行目＋2行目を結合
+                    strOutput = strOutKyo + Left(strOutMeiResult, Len(strOutMeiResult) - 2)
+                    
+                    strFileFullPath = strFilePath & strFileName & "_" & Format(intFileNo, "00") & ".txt"
+                    
+                    '出力
+                    intFileNumber = FreeFile
+                    Open strFileFullPath For Output As #intFileNumber
+                        Print #intFileNumber, strOutput;
+                    Close #intFileNumber
+                    
+                    intFileNo = intFileNo + 1
+                    
+                    strOutMeiResult = ""
+                End If
+                
+                blnOutFlg = True
+            Next
+            
+        
+        End If
+        
+        
+        MsgBox "ダウンロードが完了しました。", vbOKOnly, "通知ダイアログ"
+            
+        '明細入力画面のエラー用リスト初期化
+        wsMeisaiPrint.OLEObjects("txtErrMsg").Object.Value = ""
+        wsMeisaiPrint.OLEObjects("txtErrMsg").Activate
+        wsMeisaiPrint.OLEObjects("btnDl").Activate
+        
+    End If
+End Sub
+
+
+'印刷ボタン押下
+Private Sub BtnPrintMoushikomi_Click()
+    
+    Dim i                 As Integer
+    Dim intMeisaiCnt      As Integer
+    Dim intTotalCar       As Integer
+    Dim intPageCnt        As Integer
+    Dim intSame           As Integer
+    Dim intSaveCnt        As Integer
+    Dim strIndex          As String
+    Dim strFileName       As String
+    Dim strOutputPath     As String
+    Dim strNowTime        As String
+    Dim wsTextK           As Worksheet
+    Dim wsMeisaiPrint     As Worksheet
+    Dim wsChohyo          As Worksheet
+    Dim wsChohyoEDP       As Worksheet
+    Dim wsMeisaiPrintSet  As Worksheet
+    Dim wsMoushikomiSet_1 As Worksheet
+    Dim wsMoushikomiSet_2 As Worksheet
+    Dim wsMoushiEDPSet    As Worksheet
+    Dim wsMeisaiEDPSet    As Worksheet
+    Dim wsSetting         As Worksheet
+        
+    Dim blnFstflg         As Boolean
+    
+    Dim intConfirmMsg     As String
+    Dim strOuptutPath     As String
+    Dim strFilePath       As String
+    Dim wsAll             As Worksheet
+    Dim strSave           As String
+    Dim wsSaveCnt         As Integer
+    
+    Dim intDaishaSet    As Integer '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    
+    
+    On Error GoTo Error
+    
+    
+    Call subSetSheet(6, wsTextK) 'シートオブジェクト(別紙　申込書(1枚目)設定)
+    Call subSetSheet(18, wsMeisaiPrint) 'シートオブジェクト(明細書印刷)
+    
+    'エラーチェック
+    If fncErrCheck(wsMeisaiPrint, wsTextK.Cells(1, 19).Value) <> "" Then
+        Exit Sub
+    End If
+    
+    intConfirmMsg = MsgBox("申込書を印刷します。" & vbCrLf & "よろしいですか？", vbYesNo, "確認ダイアログ")
+    If intConfirmMsg = 6 Then
+        
+        i = 16                                                  '設定シート読み込み開始行
+        intMeisaiCnt = 1                                        '明細行
+        intPageCnt = 0                                          'ページ数
+        intSame = 1                                             '同項目数(が続いた場合カウントアップ)
+        strIndex = ""                                           '同項目比較変数
+        intSaveCnt = 0
+        blnFstflg = True
+        
+        Call subSetSheet(5, wsSetting)      'シートオブジェクト(別紙　各種設定)
+        
+        'テキストファイル出力パス取得
+        strOuptutPath = wsSetting.Range("B5").Value
+        
+        '出力ファイルパス
+        If strOuptutPath = "" Then
+            strFilePath = CreateObject("WScript.Shell").SpecialFolders.item("Desktop") & "\"
+        Else
+            strFilePath = strOuptutPath & "\"
+        End If
+        
+        strFileName = strFilePath & strTextName & "_" & "申込書・明細書・EDP.pdf"
+
+        '同名ファイル確認
+        If Dir(strFileName) <> "" Then
+            intConfirmMsg = MsgBox("同じ名前のファイルが既に存在します。上書きしますか？", vbYesNo, "確認ダイアログ")
+            If intConfirmMsg = 7 Then Exit Sub
+        End If
+        
+        'PDFファイルが開かれていることを確認
+        If fncIsFileOpen(strFileName) Then
+            intConfirmMsg = MsgBox("PDFファイルが開かれています。" & vbCrLf & "閉じてからご使用ください。", vbOKOnly, "通知ダイアログ")
+            Exit Sub
+        End If
+          
+        '警告チェック
+        If fncTextEntryWarChk(2) Then
+        End If
+            
+            
+        '現在日時取得(年月日時分)
+        strNowTime = Format(Now, "yyyymmddHHMM")
+        
+        Call subMeisaiUnProtect     'シートの保護の解除
+        Call subBookUnProtect           'ブックの保護を解除
+'        Call subSheetVisible(True)      'シート・ブックの表示
+        
+        
+        Application.ScreenUpdating = False
+        
+        '総付保台数
+        intTotalCar = Val(wsTextK.Cells(1, 19))
+        
+        'シート検索
+        For Each wsAll In ThisWorkbook.Worksheets
+            If wsAll.Name = "契約申込書1枚目WK" Then
+                Application.DisplayAlerts = False
+                Worksheets("契約申込書1枚目WK").Delete
+                Application.DisplayAlerts = True
+            ElseIf wsAll.Name = "契約申込書2枚目WK" Then
+                Application.DisplayAlerts = False
+                Worksheets("契約申込書2枚目WK").Delete
+                Application.DisplayAlerts = True
+            ElseIf wsAll.Name = "明細書WK" Then
+                Application.DisplayAlerts = False
+                Worksheets("明細書WK").Delete
+                Application.DisplayAlerts = True
+            ElseIf wsAll.Name = "申込書ＥＤＰWK" Then
+                Application.DisplayAlerts = False
+                Worksheets("申込書ＥＤＰWK").Delete
+                Application.DisplayAlerts = True
+            ElseIf wsAll.Name = "明細書ＥＤＰWK" Then
+                Application.DisplayAlerts = False
+                Worksheets("明細書ＥＤＰWK").Delete
+                Application.DisplayAlerts = True
+            End If
+        Next wsAll
+            
+        'シートコピー
+        With ThisWorkbook
+            .Worksheets("契約申込書1枚目").Visible = True
+            .Worksheets("契約申込書1枚目").Copy After:=.Worksheets(.Worksheets.Count)
+            ActiveSheet.Name = "契約申込書1枚目WK"
+            .Worksheets("契約申込書1枚目").Visible = False
+            
+            .Worksheets("契約申込書2枚目").Visible = True
+            .Worksheets("契約申込書2枚目").Copy After:=.Worksheets(.Worksheets.Count)
+            ActiveSheet.Name = "契約申込書2枚目WK"
+            .Worksheets("契約申込書2枚目").Visible = False
+            
+            .Worksheets("明細書").Visible = True
+            .Worksheets("明細書").Copy After:=.Worksheets(.Worksheets.Count)
+            ActiveSheet.Name = "明細書WK"
+            .Worksheets("明細書").Visible = False
+            
+            .Worksheets("申込書ＥＤＰ").Visible = True
+            .Worksheets("申込書ＥＤＰ").Copy After:=.Worksheets(.Worksheets.Count)
+            ActiveSheet.Name = "申込書ＥＤＰWK"
+            .Worksheets("申込書ＥＤＰ").Visible = False
+            
+            .Worksheets("明細書ＥＤＰ").Visible = True
+            .Worksheets("明細書ＥＤＰ").Copy After:=.Worksheets(.Worksheets.Count)
+            ActiveSheet.Name = "明細書ＥＤＰWK"
+            .Worksheets("明細書ＥＤＰ").Visible = False
+        End With
+        
+        Call subSetSheet(11, wsMoushikomiSet_1)  'シートオブジェクト(別紙　申込書(1枚目)設定)
+        Call subSetSheet(12, wsMoushikomiSet_2)  'シートオブジェクト(別紙　申込書(2枚目)設定)
+        Call subSetSheet(13, wsMeisaiPrintSet)   'シートオブジェクト(別紙　明細書設定)
+        Call subSetSheet(14, wsMoushiEDPSet)     'シートオブジェクト(別紙　申込書ＥＤＰ設定)
+        Call subSetSheet(15, wsMeisaiEDPSet)     'シートオブジェクト(別紙　明細書ＥＤＰ設定)
+        Call subSetSheet(105, wsChohyo)          'シートオブジェクト(明細書WK)
+        Call subSetSheet(107, wsChohyoEDP)       'シートオブジェクト(明細書ＥＤＰWK)
+        
+        
+        '帳票設定読み込み・帳票作成
+        With wsMoushikomiSet_1
+            Do Until .Cells(i, 1).MergeArea(1) = ""
+                
+                '更新用（3、取得元区分、No、セル番号、編集No、前方に追加する文字、後方に追加する文字、現在時刻）
+                Call subFormSetting(3, Val(.Cells(i, 1).MergeArea(1)), Val(.Cells(i, 2).MergeArea(1)), _
+                                    CStr(.Cells(i, 4).MergeArea(1)), Val(.Cells(i, 5).MergeArea(1)), _
+                                    CStr(.Cells(i, 6).MergeArea(1)), .Cells(i, 7).MergeArea(1), strNowTime, , , , , _
+                                    , intSame, , , blnFstflg)
+                            
+                i = i + 1
+                
+                If .Cells(i, 1).MergeArea(1) = "" And blnFstflg Then
+                    i = 16
+                    blnFstflg = False
+                End If
+            Loop
+        End With
+        
+        '帳票設定読み込み・帳票作成
+        i = 16
+        blnFstflg = True
+        With wsMoushikomiSet_2
+            Do Until .Cells(i, 1).MergeArea(1) = ""
+                
+                '更新用
+                Call subFormSetting(4, Val(.Cells(i, 1).MergeArea(1)), Val(.Cells(i, 2).MergeArea(1)), _
+                                    CStr(.Cells(i, 4).MergeArea(1)), Val(.Cells(i, 5).MergeArea(1)), _
+                                    CStr(.Cells(i, 6).MergeArea(1)), .Cells(i, 7).MergeArea(1), strNowTime, , , , , , intSame, , , blnFstflg)
+                            
+                i = i + 1
+                
+                If .Cells(i, 1).MergeArea(1) = "" And blnFstflg Then
+                    i = 16
+                    blnFstflg = False
+                End If
+                
+            Loop
+        End With
+        
+        '帳票設定読み込み・帳票作成
+        Do Until intMeisaiCnt >= intTotalCar + 1
+            i = 16
+            blnFstflg = True
+            intDaishaSet = 0 '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+                    
+            With wsMeisaiPrintSet
+                Do Until .Cells(i, 1).MergeArea(1) = ""
+        
+                    '同項目が続いた場合、intSameをカウントアップ
+                    '前項目が現在の項目と違う場合、intSameをページ開始明細行数とする
+                    If strIndex = .Cells(i, 1).MergeArea(1) & "," & Val(.Cells(i, 2).MergeArea(1)) Then
+                        '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+                        'intSame = intSame + 1
+                        If blnFstflg = False And strIndex = "2,42" Then '代車等セット特約　特殊処理（1項目で複数セットするため）
+                            intDaishaSet = intDaishaSet + 1
+                            If intDaishaSet >= 3 Then
+                                intSame = 1 + (intPageCnt * 2) + 1
+                            End If
+                        Else
+                            intSame = intSame + 1
+                        End If
+                    Else
+                        strIndex = .Cells(i, 1).MergeArea(1) & "," & Val(.Cells(i, 2).MergeArea(1))
+                        intSame = 1 + (intPageCnt * 2)
+                    End If
+                    
+                    If CStr(.Cells(i, 4).MergeArea(1)) = "" Then
+                        strSave = CStr(.Cells(i, 4).MergeArea(1))
+                    Else
+                        If Evaluate("ISREF(" & CStr(.Cells(i, 4).MergeArea(1)) & ")") = False Then
+                            strSave = ""
+                        Else
+                            strSave = CStr(.Cells(Val(.Range(CStr(.Cells(i, 4).MergeArea(1))).Row + (74 * intPageCnt)), _
+                                                    .Range(CStr(.Cells(i, 4).MergeArea(1))).Column).Address(False, False))
+                        End If
+                    End If
+                    
+                    '更新用
+                    Call subFormSetting(5, Val(.Cells(i, 1).MergeArea(1)), Val(.Cells(i, 2).MergeArea(1)), _
+                                        strSave, Val(.Cells(i, 5).MergeArea(1)), CStr(.Cells(i, 6).MergeArea(1)), _
+                                        .Cells(i, 7).MergeArea(1), strNowTime, , , , , _
+                                        , intSame, intMeisaiCnt, intPageCnt, blnFstflg)
+                    
+                    i = i + 1
+                    
+                    If .Cells(i, 1).MergeArea(1) = "" And blnFstflg Then
+                        i = 16
+                        If wsSaveCnt = 0 Then
+                            wsSaveCnt = intMeisaiCnt
+                            intMeisaiCnt = 1
+                        Else
+                        End If
+                        blnFstflg = False
+                    End If
+                
+                Loop
+                
+                
+                intPageCnt = intPageCnt + 1
+                
+                If intMeisaiCnt < intTotalCar + 1 Then
+                    ' 1 ～ 74 行目を 75 行目 へ貼り付け
+                    Application.DisplayAlerts = False
+                    wsChohyo.Activate
+                    wsChohyo.Range("1:74").Copy
+                    wsChohyo.Range(CStr(74 * Val(intPageCnt) + 1 & ":" & 74 * Val(intPageCnt) + 1)).Select
+                    wsChohyo.Paste
+                    Application.DisplayAlerts = True
+                End If
+            
+            End With
+            
+        Loop
+        
+        '帳票設定読み込み・帳票作成
+        Dim varEdpItem As Variant
+        Dim intMaxRow As Integer
+                
+        i = 17
+        intSame = 1
+        blnFstflg = True
+        intPageCnt = 0
+         
+        With wsMoushiEDPSet
+            
+            intMaxRow = Application.WorksheetFunction.Max(.Columns(8))
+            ReDim varEdpItem(2, IIf(intMaxRow = 0, 0, intMaxRow - 1))
+
+            Do Until .Cells(i, 1).MergeArea(1) = ""
+                
+                '更新用
+                Call subFormSetting(6, Val(.Cells(i, 1).MergeArea(1)), Val(.Cells(i, 2).MergeArea(1)), _
+                                    CStr(.Cells(i, 4).MergeArea(1)), Val(.Cells(i, 5).MergeArea(1)), _
+                                    CStr(.Cells(i, 6).MergeArea(1)), .Cells(i, 7).MergeArea(1), strNowTime, _
+                                    , Val(.Cells(i, 8).MergeArea(1)), CStr(.Cells(i, 9).MergeArea(1)), _
+                                    CStr(.Cells(i, 10).MergeArea(1)), varEdpItem, intSame, , , blnFstflg)
+                
+                i = i + 1
+                
+                If .Cells(i, 1).MergeArea(1) = "" And blnFstflg Then
+                    i = 17
+                    blnFstflg = False
+                End If
+            Loop
+        End With
+        
+        Call subFormEDPEdit(1, varEdpItem, intPageCnt, "B11")
+        
+        Set varEdpItem = Nothing
+        
+        Dim varEdpMsai As Variant
+        
+        i = 17                                                  '設定シート読み込み開始行
+        intMeisaiCnt = 1                                        '明細行
+        intPageCnt = 0                                          'ページ数
+        intSame = 1                                             '同項目数(が続いた場合カウントアップ)
+        strIndex = ""                                           '同項目比較変数
+        wsSaveCnt = 0
+        blnFstflg = True
+        
+        intMaxRow = Application.WorksheetFunction.Max(wsMeisaiEDPSet.Columns(9))
+        
+        '帳票設定読み込み・帳票作成
+        Do Until intMeisaiCnt >= intTotalCar + 1
+            i = 17
+            blnFstflg = True                                        '初期化フラグ
+            
+            ReDim varEdpMsai(3, 2, IIf(intMaxRow = 0, 0, intMaxRow - 1))
+            
+            With wsMeisaiEDPSet
+                Do Until .Cells(i, 1).MergeArea(1) = ""
+                        
+                    '同項目が続いた場合、intSameをカウントアップ
+                    '前項目が現在の項目と違う場合、intSameをページ開始明細行数とする
+                    If strIndex = .Cells(i, 1).MergeArea(1) & "," & Val(.Cells(i, 2).MergeArea(1)) Then
+                        intSame = intSame + 1
+                    Else
+                        strIndex = .Cells(i, 1).MergeArea(1) & "," & Val(.Cells(i, 2).MergeArea(1))
+                        intSame = 1 + (intPageCnt * 1)
+                    End If
+                    
+                    If CStr(.Cells(i, 4).MergeArea(1)) = "" Then
+                        strSave = CStr(.Cells(i, 4).MergeArea(1))
+                    Else
+                        If Evaluate("ISREF(" & CStr(.Cells(i, 4).MergeArea(1)) & ")") = False Then
+                            strSave = ""
+                        Else
+                            strSave = CStr(.Cells(Val(.Range(CStr(.Cells(i, 4).MergeArea(1))).Row + (85 * intPageCnt)), _
+                                                    .Range(CStr(.Cells(i, 4).MergeArea(1))).Column).Address(False, False))
+                        End If
+                    End If
+                    
+                    '更新用
+                    Call subFormSetting(7, Val(.Cells(i, 1).MergeArea(1)), Val(.Cells(i, 2).MergeArea(1)), _
+                                        strSave, Val(.Cells(i, 5).MergeArea(1)), CStr(.Cells(i, 6).MergeArea(1)), _
+                                        .Cells(i, 7).MergeArea(1), strNowTime, Val(.Cells(i, 8).MergeArea(1)), _
+                                        Val(.Cells(i, 9).MergeArea(1)), CStr(.Cells(i, 10).MergeArea(1)), _
+                                        CStr(.Cells(i, 11).MergeArea(1)), varEdpMsai, intSame, intMeisaiCnt, intPageCnt, blnFstflg)
+                    
+                    i = i + 1
+                    
+                    If .Cells(i, 1).MergeArea(1) = "" And blnFstflg Then
+                        i = 17
+                        If wsSaveCnt = 0 Then
+                            wsSaveCnt = intMeisaiCnt
+                            intMeisaiCnt = 1
+                        Else
+                        End If
+                        blnFstflg = False
+                    End If
+                
+                Loop
+            
+                Call subFormEDPEdit(2, varEdpMsai, intPageCnt, "B11")
+                
+                intPageCnt = intPageCnt + 1
+                
+                If intMeisaiCnt < intTotalCar + 1 Then
+                    ' 1 ～ 85 行目を 86 行目 へ貼り付け
+                    Application.DisplayAlerts = False
+                    wsChohyoEDP.Activate
+                    '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+                    'wsChohyoEDP.Range("1:84").Copy
+                    ThisWorkbook.Worksheets("明細書ＥＤＰ").Range("1:85").Copy
+                    wsChohyoEDP.Range(CStr(85 * Val(intPageCnt) + 1 & ":" & 85 * Val(intPageCnt) + 1)).Select
+                    wsChohyoEDP.Paste
+                    Application.DisplayAlerts = True
+                End If
+
+            End With
+
+        Loop
+
+
+        Dim strPrintSheet(4) As String
+        strPrintSheet(0) = "契約申込書1枚目WK"
+        strPrintSheet(1) = "契約申込書2枚目WK"
+        strPrintSheet(2) = "明細書WK"
+        strPrintSheet(3) = "申込書ＥＤＰWK"
+        strPrintSheet(4) = "明細書ＥＤＰWK"
+
+        ThisWorkbook.Worksheets(strPrintSheet).Select
+        ActiveSheet.ExportAsFixedFormat Type:=xlTypePDF, fileName:=strFileName
+
+        'シート削除
+        Application.DisplayAlerts = False
+        ThisWorkbook.Worksheets("契約申込書1枚目WK").Delete
+        ThisWorkbook.Worksheets("契約申込書2枚目WK").Delete
+        ThisWorkbook.Worksheets("明細書WK").Delete
+        ThisWorkbook.Worksheets("申込書ＥＤＰWK").Delete
+        ThisWorkbook.Worksheets("明細書ＥＤＰWK").Delete
+        Application.DisplayAlerts = True
+
+'        Call subSheetVisible(False)     'シート・ブックの非表示
+        Call subBookProtect             'ブックの保護
+        Call subMeisaiProtect           'シートの保護
+
+        Application.ScreenUpdating = True
+
+        '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+        'MsgBox "印刷が完了しました。", vbOKOnly, "通知ダイアログ"
+        MsgBox "PDFファイルを出力しました。", vbOKOnly, "通知ダイアログ"
+
+        Set wsTextK = Nothing
+        Set wsChohyo = Nothing
+        Set wsMoushikomiSet_1 = Nothing
+        Set wsMoushikomiSet_2 = Nothing
+        Set wsMoushiEDPSet = Nothing
+        Set wsMeisaiEDPSet = Nothing
+
+    End If
+
+    On Error GoTo 0
+
+    Exit Sub
+
+Error:
+    MsgBox "BtnPrintMoushikomi_Click" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+
+End Sub
+
+'戻るボタン押下
+Private Sub CmdBack_Click()
+
+    Dim intConfirmMsg As Integer
+
+
+    On Error GoTo Error
+
+    intConfirmMsg = MsgBox("申込書印刷画面に遷移します。" & vbCrLf & "よろしいですか。", vbYesNo, "確認ダイアログ")
+    If intConfirmMsg = 7 Then
+    Else
+    
+        '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+        blnMoushikomiflg = False
+
+        'シート・ブックの非表示
+        Call subSheetVisible(False)
+
+        '申込書印刷画面を表示
+        frmEntryMoushikomi.Show vbModeless
+    End If
+
+    On Error GoTo 0
+
+    Exit Sub
+
+Error:
+     MsgBox "CmdBack_Click" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+
+End Sub
+
+
+'エラーチェック
+Private Function fncErrCheck(ByVal objWorkSheet As Worksheet, ByVal intSoufuhodaisu As Integer)
+
+    Dim intStartRow As Integer
+    Dim strErrRow As String
+    Dim strErrCheck As String
+    Dim strErrRowMsg As String
+    Dim strErrMsg As String
+    Dim i As Integer
+
+
+    intStartRow = 7
+
+    With objWorkSheet
+
+        For i = 0 To intSoufuhodaisu - 1
+
+            strErrRow = CStr(intStartRow + i)
+            strErrCheck = ""
+            strErrRowMsg = ""
+
+
+            ''登録番号（漢字）
+            If Not Trim(.Range("F" & strErrRow).Value) = "" Then
+                ',(カンマ)チェック
+                strErrCheck = fncCommaCheck(Trim(.Range("C" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・登録番号（漢字）" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+                '全角チェック
+                strErrCheck = fncZenkakuCheck(Trim(.Range("C" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・登録番号（漢字）" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+
+            ''登録番号（カナ）
+            If Not Trim(.Range("D" & strErrRow).Value) = "" Then
+                ',(カンマ)チェック
+                strErrCheck = fncCommaCheck(Trim(.Range("D" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・登録番号（カナ）" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+                '半角英数チェック
+                strErrCheck = fncHankakuCheck(Trim(.Range("D" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・登録番号（カナ）" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+
+            ''車台番号
+            If Not Trim(.Range("E" & strErrRow).Value) = "" Then
+                ',(カンマ)チェック
+                strErrCheck = fncCommaCheck(Trim(.Range("E" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・車台番号" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+                '半角英数チェック
+                strErrCheck = fncHankakuCheck(Trim(.Range("E" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・車台番号" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+
+            ''車検満了日
+            If Not Trim(.Range("F" & strErrRow).Value) = "" Then
+                '桁数チェック
+                strErrCheck = fncKetaCheck(Trim(.Range("F" & strErrRow).Value), 11, ">")
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・車検満了日" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                Else
+                    '和暦チェック
+                    strErrCheck = fncWarekiCheck(Trim(.Range("F" & strErrRow).Value))
+                    If Not strErrCheck = "" Then
+                        strErrRowMsg = strErrRowMsg & "・車検満了日" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                    Else
+                        '日付チェック
+                        strErrCheck = fncDateCheck(Trim(.Range("F" & strErrRow).Value), True)
+                        If Not strErrCheck = "" Then
+                            strErrRowMsg = strErrRowMsg & "・車検満了日" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                        End If
+                    End If
+                End If
+            End If
+
+            ''エラー判定
+            If strErrRowMsg <> "" Then
+                strErrMsg = strErrMsg & "◆ " & fncFormatDigit(strErrRow, " ", 4) & " 行目" & _
+                            " （明細No " & fncFormatDigit(CStr(i + 1), " ", 3) & ")" & vbCrLf & Left(strErrRowMsg, Len(strErrRowMsg) - 2)
+                strErrMsg = strErrMsg & String(62, "-") & vbCrLf
+            End If
+
+        Next i
+
+        'エラーチェック完了
+        .OLEObjects("txtErrMsg").Object.Value = strErrMsg & "チェック完了" & " [ " & Format(Time, "HH:MM:SS") & " ]"
+        .OLEObjects("txtErrMsg").Object.SelStart = 0
+        .OLEObjects("txtErrMsg").Activate
+
+    End With
+
+    fncErrCheck = strErrMsg
+
+End Function
+
+
+Private Sub Worksheet_Change(ByVal Target As Range)
+    Dim wsMeisai As Worksheet           '明細入力ワークシート
+    Dim strFinalCol As String           'シートの最終列
+
+    Call subSetSheet(18, wsMeisai)       'シートオブジェクト(明細入力)
+    strFinalCol = "J7"
+
+    If Not Application.Intersect(Target, wsMeisai.Range(wsMeisai.Range("C7"), wsMeisai.Range(strFinalCol).End(xlDown))) Is Nothing Then
+
+        Dim blnProtect As Boolean
+
+        If wsMeisai.ProtectContents Then
+            blnProtect = True
+        End If
+
+        If blnProtect Then
+            Call subMeisaiPrtUnProtect       'シートの保護の解除
+        End If
+
+        Application.ScreenUpdating = False   '描画停止
+
+        ''フォント
+        '表示形式
+        If Not Target.NumberFormatLocal = "@" Then
+            Target.NumberFormatLocal = "@"
+        End If
+        'ハイパーリンク
+        If Target.Hyperlinks.Count > 0 Then
+            Target.Hyperlinks.Delete
+        End If
+        'スタイル
+        If Not Target.Font.Name = "MS Pゴシック" Then
+            Target.Font.Name = "MS Pゴシック"
+        End If
+        'サイズ
+        If Not Target.Font.Size = 8 Then
+            Target.Font.Size = 8
+        End If
+        '色
+        If Not Target.Font.Color = False Then
+            Target.Font.Color = False
+        End If
+        '太字
+        If Not Target.Font.Bold = False Then
+            Target.Font.Bold = False
+        End If
+        '斜体
+        If Not Target.Font.Italic = False Then
+            Target.Font.Italic = False
+        End If
+        '下線
+        If Not Target.Font.Underline = xlUnderlineStyleNone Then
+            Target.Font.Underline = xlUnderlineStyleNone
+        End If
+        '取り消し線
+        If Not Target.Font.Strikethrough = False Then
+            Target.Font.Strikethrough = False
+        End If
+        '上付き
+        If Not Target.Font.Superscript = False Then
+            Target.Font.Superscript = False
+        End If
+        '下付き
+        If Not Target.Font.Subscript = False Then
+            Target.Font.Subscript = False
+        End If
+        'セルの色
+        If Not Target.Interior.ColorIndex = 0 Then
+            Target.Interior.ColorIndex = 0
+        End If
+
+        ''罫線
+        '上端
+        If Not Target.Borders(xlEdgeTop).LineStyle = xlContinuous Then
+            Target.Borders(xlEdgeTop).LineStyle = xlContinuous
+        End If
+        '上端_太さ
+        If Not Target.Borders(xlEdgeTop).Weight = xlThin Then
+            Target.Borders(xlEdgeTop).Weight = xlThin
+        End If
+        '上端_色
+        If Not Target.Borders(xlEdgeTop).Color = 0 Then
+            Target.Borders(xlEdgeTop).Color = 0
+        End If
+        '下端
+        If Not Target.Borders(xlEdgeBottom).LineStyle = xlContinuous Then
+            Target.Borders(xlEdgeBottom).LineStyle = xlContinuous
+        End If
+        '下端_太さ
+        If Not Target.Borders(xlEdgeBottom).Weight = xlThin Then
+            Target.Borders(xlEdgeBottom).Weight = xlThin
+        End If
+        '下端_色
+        If Not Target.Borders(xlEdgeBottom).Color = 0 Then
+            Target.Borders(xlEdgeBottom).Color = 0
+        End If
+        '右端
+        If Not Target.Borders(xlEdgeRight).LineStyle = xlContinuous Then
+            Target.Borders(xlEdgeRight).LineStyle = xlContinuous
+        End If
+        '右端_太さ
+        If Not Target.Borders(xlEdgeRight).Weight = xlThin Then
+            Target.Borders(xlEdgeRight).Weight = xlThin
+        End If
+        '右端_色
+        If Not Target.Borders(xlEdgeRight).Color = 0 Then
+            Target.Borders(xlEdgeRight).Color = 0
+        End If
+        '左端
+        If Not Target.Borders(xlEdgeLeft).LineStyle = xlContinuous Then
+            Target.Borders(xlEdgeLeft).LineStyle = xlContinuous
+        End If
+        '左端_太さ
+        If Not Target.Borders(xlEdgeLeft).Weight = xlThin Then
+            Target.Borders(xlEdgeLeft).Weight = xlThin
+        End If
+        '左端_色
+        If Not Target.Borders(xlEdgeLeft).Color = 0 Then
+            Target.Borders(xlEdgeLeft).Color = 0
+        End If
+        '内側横
+        If Not Target.Borders(xlInsideHorizontal).LineStyle = xlContinuous Then
+            Target.Borders(xlInsideHorizontal).LineStyle = xlContinuous
+        End If
+        '内側横_太さ
+        If Not Target.Borders(xlInsideHorizontal).Weight = xlThin Then
+            Target.Borders(xlInsideHorizontal).Weight = xlThin
+        End If
+        '内側横_色
+        If Not Target.Borders(xlInsideHorizontal).Color = 0 Then
+            Target.Borders(xlInsideHorizontal).Color = 0
+        End If
+        '内側縦
+        If Not Target.Borders(xlInsideVertical).LineStyle = xlContinuous Then
+            Target.Borders(xlInsideVertical).LineStyle = xlContinuous
+        End If
+        '内側縦_太さ
+        If Not Target.Borders(xlInsideVertical).Weight = xlThin Then
+            Target.Borders(xlInsideVertical).Weight = xlThin
+        End If
+        '内側縦_色
+        If Not Target.Borders(xlInsideVertical).Color = 0 Then
+            Target.Borders(xlInsideVertical).Color = 0
+        End If
+        '右下がり斜線
+        If Not Target.Borders(xlDiagonalDown).LineStyle = xlLineStyleNone Then
+            Target.Borders(xlDiagonalDown).LineStyle = xlLineStyleNone
+        End If
+        '右上がり斜線
+        If Not Target.Borders(xlDiagonalUp).LineStyle = xlLineStyleNone Then
+            Target.Borders(xlDiagonalUp).LineStyle = xlLineStyleNone
+        End If
+
+        '文字位置
+        '水平左寄せ
+        If Not Target.HorizontalAlignment = xlLeft Then
+            Target.HorizontalAlignment = xlLeft
+        End If
+        '垂直中央
+        If Not Target.VerticalAlignment = xlCenter Then
+            Target.VerticalAlignment = xlCenter
+        End If
+
+        If blnProtect Then
+            Call subMeisaiPrtProtect           'シートの保護
+        End If
+
+    End If
+
+    Set wsMeisai = Nothing
+
+End Sub
+

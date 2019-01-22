@@ -1,0 +1,22 @@
+﻿Option Explicit
+
+Private Sub Worksheet_Change(ByVal Target As Range)
+    Dim wsSetting As Worksheet
+    Call subSetSheet(5, wsSetting)      'シートオブジェクト(別紙　各種設定)
+    
+    If Target.Address = wsSetting.Range("B4").Address Then
+        Dim strChangeTar As String
+        
+        strChangeTar = Target.Value
+        Application.EnableEvents = False
+        Application.Undo
+        
+        Call subBookUnProtect           'ブックの保護解除(変更前のパスワードで解除)
+        Target.Value = strChangeTar
+        Call subBookProtect             'ブックの保護(変更後のパスワードで保護)
+        
+        Application.EnableEvents = True
+        
+    End If
+    
+End Sub

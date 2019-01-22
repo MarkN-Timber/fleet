@@ -1,0 +1,1571 @@
+﻿Option Explicit
+
+'確認ダイアログから返される値
+Dim intConfirmMsg As Integer
+'テキストファイル出力時の判別フラグ
+Dim blnDownloadflg As Boolean
+
+'戻るボタン押下
+Private Sub CmdBack_Click()
+    Dim wsText As Worksheet
+'    Dim blnChouhyouflg As Boolean
+    Dim i As Integer
+
+    On Error GoTo Error
+    
+'    blnChouhyouflg = False
+'
+'    Call subSetSheet(6, wsText)       'シートオブジェクト(テキスト内容（共通）)
+'
+'    For i = 1 To 21
+'        If wsText.Cells(1, i) <> "" Then
+'            blnChouhyouflg = True
+'        End If
+'    Next i
+'
+'    If blnChouhyouflg Then
+'        intConfirmMsg = MsgBox("入力内容を反映せずに帳票選択画面に遷移します。" & vbCrLf & "よろしいですか。", vbYesNo, "確認ダイアログ")
+'    Else
+'        intConfirmMsg = MsgBox("共通項目画面に遷移します。" & vbCrLf & "よろしいですか。", vbYesNo, "確認ダイアログ")
+'    End If
+
+    '20190110対応↓
+    If MeisaiBackFlg = 0 Then
+        intConfirmMsg = MsgBox("入力内容を反映せずに帳票選択画面に遷移します。" & vbCrLf & "よろしいですか。", vbYesNo, "確認ダイアログ")
+    Else
+        intConfirmMsg = MsgBox("共通項目画面に遷移します。" & vbCrLf & "よろしいですか。", vbYesNo, "確認ダイアログ")
+    End If
+    '20190110対応↑
+    
+    If intConfirmMsg = 7 Then
+    Else
+
+        'シート・ブックの非表示
+        Call subSheetVisible(False)
+
+'        If blnChouhyouflg Then
+        '20190110対応
+        If MeisaiBackFlg = 0 Then
+            '帳票選択画面を表示
+            frmPrintMenu.Show vbModeless
+        Else
+            Dim wsMeisai As Worksheet
+            '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+            'Call subSetSheet(1, wsMeisai)        'シートオブジェクト(明細入力)
+            Call subSetSheet(17, wsMeisai)       'シートオブジェクト(明細入力（ノンフリート）)
+
+            '共通項目画面の総付保台数を更新
+            Dim objSouhuho As Object
+            Set objSouhuho = wsMeisai.OLEObjects("txtSouhuho").Object
+            frmKyoutsuu.txtSouFuhoDaisu = Left(objSouhuho.Value, Len(objSouhuho.Value) - 2)
+
+            Set wsMeisai = Nothing
+            Set objSouhuho = Nothing
+
+            '共通項目画面を表示
+            frmKyoutsuu.Show vbModeless
+        End If
+    End If
+
+    On Error GoTo 0
+
+    Exit Sub
+
+Error:
+     MsgBox "CmdBack_Click" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+
+End Sub
+
+'車両情報取込ボタン押下
+Private Sub CmdSyasyuSet_Click()
+
+    On Error GoTo Error
+
+    'ファイル選択ダイアログ
+    Dim strFilePath As String
+    strFilePath = Application.GetOpenFilename(FileFilter:="Excelファイル,*.xlsx;*.xls;*.xlsm")
+
+    If strFilePath <> "False" Then
+
+        '「総付保台数」取得
+        Dim strMaxMeisai As String
+        Dim wsMeisai As Worksheet
+        '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+        'Call subSetSheet(1, wsMeisai)       'シートオブジェクト(明細入力)
+        Call subSetSheet(17, wsMeisai)       'シートオブジェクト(明細入力（ノンフリート）)
+
+        Dim objSouhuho As Object
+        Set objSouhuho = wsMeisai.OLEObjects("txtSouhuho").Object
+        strMaxMeisai = Left(objSouhuho.Value, Len(objSouhuho.Value) - 2)
+
+        '「取込行数」取得
+        Dim wbWorkBook As Workbook
+
+        Dim strFileName As String
+        strFileName = Mid(strFilePath, InStrRev(strFilePath, "\") + 1)
+
+        Dim blnFileFlg As Boolean
+        Dim WB As Workbook
+        Dim wsWorkSheet As Worksheet
+        For Each WB In Workbooks
+            If WB.Name = strFileName Then
+                blnFileFlg = True
+            End If
+        Next WB
+
+        On Error GoTo 0
+
+        On Error GoTo OpenErr
+
+        'シート・ブックの非表示
+        Call subSheetVisible(False)
+
+        Set WB = Nothing
+
+        If blnFileFlg Then
+            blnSyaryouOpenFlg = True
+            intConfirmMsg = MsgBox("ファイルが開かれています。" & vbCrLf & "閉じてからご使用ください。", vbOKOnly, "通知ダイアログ")
+            If intConfirmMsg = 1 Then
+                'シート・ブックの表示
+                Call subBookUnProtect 'ブックの保護を解除 2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+                Call subSheetVisible(True)
+                Call subBookProtect   'ブックの保護 2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+
+                Exit Sub
+            End If
+        Else
+            blnSyaryouOpenFlg = False
+            Set wbWorkBook = Workbooks.Open(strFilePath)
+        End If
+        Windows(wbWorkBook.Name).Visible = False
+        Set wsWorkSheet = wbWorkBook.Sheets(1)
+
+        On Error GoTo 0
+
+        On Error GoTo Error
+
+        Dim i As Long
+        Dim lngTmpRow As Long
+        Dim lngMaxRow As Long
+
+        '車両情報ファイル最後列まで取得（フリート:11列、ノンフリート:19列）
+        '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+        'For i = 1 To 11
+        '    lngTmpRow = wsWorkSheet.Cells(wsWorkSheet.Rows.Count, i).End(xlUp).Row
+        '    If lngTmpRow > lngMaxRow Then
+        '        lngMaxRow = lngTmpRow
+        '    End If
+        'Next
+        For i = 1 To 12
+            lngTmpRow = wsWorkSheet.Cells(wsWorkSheet.Rows.Count, i).End(xlUp).Row
+            If lngTmpRow > lngMaxRow Then
+                lngMaxRow = lngTmpRow
+            End If
+        Next
+
+        Set objSouhuho = Nothing
+        Set wsMeisai = Nothing
+        Set wbWorkBook = Nothing
+
+        'フォーム設定
+        frmSyaryou.txtFilePath = strFilePath
+        'frmSyaryou.txtFilePath.SetFocus '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+        frmSyaryou.txtFilePath.SelStart = 0
+        frmSyaryou.lblMaxMeisai = "総付保台数：" & strMaxMeisai & "台"
+        frmSyaryou.lblMaxRow = "取込台数：" & CStr(lngMaxRow - 1) & "台"
+        frmSyaryou.Show vbModeless
+
+    End If
+
+    On Error GoTo 0
+
+    Exit Sub
+
+OpenErr:
+    'シート・ブックの表示
+    Call subBookUnProtect 'ブックの保護を解除 2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    Call subSheetVisible(True)
+    Call subBookProtect   'ブックの保護 2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+
+    MsgBox "CmdSyasyuSet_Click" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+    Exit Sub
+
+Error:
+     MsgBox "CmdSyasyuSet_Click" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+
+End Sub
+
+
+'補償内容セット一括ボタン押下
+Private Sub CmdHosyouSet_Click()
+
+    'シート・ブックの非表示
+    Call subSheetVisible(False)
+
+    frmHosyoSet.Show vbModeless
+End Sub
+
+'明細追加ボタン押下
+Private Sub btnMeisaiAdd_Click()
+    Dim blnErrCheckFlg As Boolean
+    Dim intSouhuho  As Integer
+    
+    On Error GoTo Error
+    
+    Dim wsMeisai As Worksheet           '明細入力ワークシート
+    '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    'Call subSetSheet(1, wsMeisai)       'シートオブジェクト(明細入力)
+    Call subSetSheet(17, wsMeisai)      'シートオブジェクト(明細入力（ノンフリート）)
+
+    Dim objSouhuho As Object
+    Set objSouhuho = wsMeisai.OLEObjects("txtSouhuho").Object
+    
+    blnErrCheckFlg = False
+    intSouhuho = Left(objSouhuho.Value, Len(objSouhuho.Value) - 2)
+    
+    '必須チェック
+    If Not fncNeedCheck(Trim(TxtMsaiAddCnt.Value)) = "" Then
+        intConfirmMsg = MsgBox("追加する行数を入力してください。", vbExclamation, "エラーダイアログ")
+        blnErrCheckFlg = True
+    Else
+        '数字チェック
+        If Not fncNumCheck(Trim(TxtMsaiAddCnt.Value)) = "" Then
+            intConfirmMsg = MsgBox("追加する行数を入力してください。", vbExclamation, "エラーダイアログ")
+            blnErrCheckFlg = True
+        Else
+            '数値チェック
+            If Not fncNumRangeCheck(Val(Trim(TxtMsaiAddCnt.Value)), 1, 999) = "" Then
+                blnErrCheckFlg = True
+            End If
+            '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+            '明細行の合計が999台を超える場合、エラー
+'            If Val(TxtMsaiAddCnt.Value) + intSouhuho > 999 Then
+'                intConfirmMsg = MsgBox("総付保台数が999件を超過するため追加できません。", vbExclamation, "エラーダイアログ")
+'                blnErrCheckFlg = True
+'            End If
+            '明細行の合計が9台を超える場合、エラー
+            If Val(TxtMsaiAddCnt.Value) + intSouhuho > 9 Then
+                intConfirmMsg = MsgBox("総付保台数が9件を超過するため追加できません。", vbExclamation, "エラーダイアログ")
+                blnErrCheckFlg = True
+            End If
+        End If
+    End If
+    
+    If blnErrCheckFlg = False Then
+        intConfirmMsg = MsgBox(Trim(TxtMsaiAddCnt.Value) & "行追加します。" & vbCrLf & "よろしいですか。", vbYesNo, "確認ダイアログ")
+        If intConfirmMsg = 7 Then
+        Else
+            Call subMeisaiUnProtect                                 'シートの保護を解除
+            '明細行追加
+            Call subMeisaiAdd(Val(Trim(TxtMsaiAddCnt.Value)), "1")
+            
+            '明細入力画面のエラー用リスト初期化
+            wsMeisai.OLEObjects("txtErrMsg").Object.Value = ""
+            '明細入力画面の明細追加行テキストボックスを初期化
+            wsMeisai.OLEObjects("TxtMsaiAddCnt").Object.Value = ""
+            wsMeisai.OLEObjects("txtErrMsg").Activate
+            wsMeisai.OLEObjects("btnMeisaiAdd").Activate
+
+            Call subMeisaiProtect                                   'シートの保護
+
+            MsgBox "行の追加が完了しました。", vbOKOnly, "通知ダイアログ"
+
+        End If
+    End If
+
+    Set wsMeisai = Nothing
+    Set objSouhuho = Nothing
+
+    On Error GoTo 0
+
+    Exit Sub
+
+Error:
+     MsgBox "btnMeisaiAdd_Click" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+
+End Sub
+
+
+'明細削除ボタン押下
+Private Sub CmdMeisaiDel_Click()
+    Dim blnChkFlg As Boolean        '明細チェックフラグ
+    Dim strTagetRange As String
+    Dim rngChkAll As Range          'ループ用レンジ
+
+    On Error GoTo Error
+
+    Dim wsMeisai As Worksheet           '明細入力ワークシート
+    '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    'Call subSetSheet(1, wsMeisai)       'シートオブジェクト(明細入力)
+    Call subSetSheet(17, wsMeisai)      'シートオブジェクト(明細入力（ノンフリート）)
+
+    blnChkFlg = False
+    'チェックの入っている明細チェックを確認
+    For Each rngChkAll In wsMeisai.Range("A21" & ":" & wsMeisai.Cells(wsMeisai.Rows.Count, 1).End(xlUp).Address)
+        If InStr(rngChkAll.Value, "True") > 0 Then
+            blnChkFlg = True
+            Exit For
+        End If
+    Next rngChkAll
+
+    Set rngChkAll = Nothing
+
+    If blnChkFlg Then
+        intConfirmMsg = MsgBox("選択した行を削除します。" & vbCrLf & "よろしいですか。", vbYesNo, "確認ダイアログ")
+        If intConfirmMsg = 7 Then
+        Else
+            Call subMeisaiUnProtect                                 'シートの保護を解除
+            '明細行削除
+            Call subMeisaiDel("", "1")
+
+            '明細入力画面のエラー用リスト初期化
+            wsMeisai.OLEObjects("txtErrMsg").Object.Value = ""
+            wsMeisai.OLEObjects("txtErrMsg").Activate
+            wsMeisai.OLEObjects("CmdMeisaiDel").Activate
+
+            Call subMeisaiProtect                                   'シートの保護
+
+            MsgBox "行の削除が完了しました。", vbOKOnly, "通知ダイアログ"
+        End If
+    Else
+        intConfirmMsg = MsgBox("削除する行を選択してください。", vbExclamation, "エラーダイアログ")
+    End If
+
+    Set wsMeisai = Nothing
+
+    On Error GoTo 0
+
+    Exit Sub
+
+Error:
+    MsgBox "エラー番号:" & Err.Number & vbCrLf & _
+           "エラーの種類:" & Err.Description, vbExclamation, "CmdMeisaiDel_Click"
+
+End Sub
+
+
+'ダウンロードボタン押下
+Private Sub btnDl_Click()
+    Dim i As Integer                'ループカウント
+    Dim strErrRow As String         'エラーチェック行
+    Dim strErrCon As String         'エラーチェックコントロールの番号
+    Dim strErrMsg As String         'エラーメッセージ
+    Dim strErrRowMsg As String      '行ごとのエラーメッセージ
+    Dim strErrReturn As String      'エラー関数で返ってくる値
+    Dim rngChkAll As Range
+    Dim intStartRow As Integer
+    Dim strErrCheck As String
+    Dim intCntLoop As Integer
+    Dim blnReltErrFlg As Boolean
+    Dim blnReltJinErrFlg As Boolean
+    Dim blnErrFlg As Boolean
+
+    On Error GoTo Error
+
+    Dim wsMeisai As Worksheet           '明細入力ワークシート
+    Dim wsKyoutsu As Worksheet           '共通項目ワークシート
+    '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    'Call subSetSheet(1, wsMeisai)       'シートオブジェクト(明細入力)
+    Call subSetSheet(17, wsMeisai)      'シートオブジェクト(明細入力（ノンフリート）)
+    Call subSetSheet(2, wsKyoutsu)      'シートオブジェクト(明細入力（ノンフリート）)
+
+    intStartRow = 20                    '計算用シートの開始行
+
+    '入力チェック
+
+    strErrRow = ""
+    strErrCon = ""
+    strErrMsg = ""
+    strErrReturn = ""
+    blnReltErrFlg = False
+    blnReltJinErrFlg = False
+
+    With wsMeisai
+
+        '明細チェックの数分ループ
+        For Each rngChkAll In .Range("A21" & ":" & .Cells(.Rows.Count, 1).End(xlUp).Address)
+
+            strErrCheck = ""
+            strErrRowMsg = ""
+
+            '対象の行数を設定
+            strErrRow = rngChkAll.Row
+            intCntLoop = intCntLoop + 1
+            '対象のコントロールの番号を設定
+            strErrCon = Left(rngChkAll, InStr(rngChkAll, "/") - 1)
+
+            ''用途車種
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("C" & strErrRow).Value, "Z2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・用途車種" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            End If
+
+            ''コード
+            '必須チェック
+            strErrCheck = fncNeedCheck(.Range("D" & strErrRow).Value)
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・コード" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            Else
+                'コード値チェック
+                strErrCheck = fncCodeCheck(.Range("D" & strErrRow).Value, "AA2")
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・コード" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+
+            ''車名
+            If Not Trim(.Range("E" & strErrRow).Value) = "" Then
+                ',(カンマ)チェック
+                strErrCheck = fncCommaCheck(Trim(.Range("E" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・車名" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+                '全角チェック
+                strErrCheck = fncZenkakuCheck(Trim(.Range("E" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・車名" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+
+            ''登録番号
+            If Not Trim(.Range("F" & strErrRow).Value) = "" Then
+                ',(カンマ)チェック
+                strErrCheck = fncCommaCheck(Trim(.Range("F" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・登録番号" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+                '全角チェック
+                strErrCheck = fncZenkakuCheck(Trim(.Range("F" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・登録番号" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+
+            ''車台番号
+            If Not Trim(.Range("G" & strErrRow).Value) = "" Then
+                ',(カンマ)チェック
+                strErrCheck = fncCommaCheck(Trim(.Range("G" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・車台番号" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+                '半角英数チェック
+                strErrCheck = fncHankakuCheck(Trim(.Range("G" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・車台番号" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+
+            ''型式
+            If Not Trim(.Range("H" & strErrRow).Value) = "" Then
+                ',(カンマ)チェック
+                strErrCheck = fncCommaCheck(Trim(.Range("H" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・型式" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+                '半角英数チェック
+                strErrCheck = fncHankakuCheck(Trim(.Range("H" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・型式" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+
+            ''仕様
+            If Not Trim(.Range("I" & strErrRow).Value) = "" Then
+                ',(カンマ)チェック
+                strErrCheck = fncCommaCheck(Trim(.Range("I" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・仕様" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+                '全角チェック
+                strErrCheck = fncZenkakuCheck(Trim(.Range("I" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・仕様" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+
+            ''初度登録
+            '必須チェック
+            Dim strDay As String
+            Dim Syaryou(4) As String
+            Dim Syaryou_flg As String
+            Dim item As Variant
+
+            Syaryou(0) = "76"
+            Syaryou(1) = "78"
+            Syaryou(2) = "79"
+            Syaryou(3) = "92"
+            Syaryou(4) = "93"
+
+            Syaryou_flg = False
+            For item = 0 To 4
+
+                If Range("D" & strErrRow).Value = Syaryou(item) Then
+                    Syaryou_flg = True
+                    Exit For
+                End If
+
+            Next item
+
+            strErrCheck = fncNeedCheck(Trim(.Range("J" & strErrRow).Value))
+
+            If Not strErrCheck = "" Then
+                If Syaryou_flg Then
+                    strErrCheck = ""
+                Else
+                    strErrRowMsg = strErrRowMsg & "・初度登録" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+            Else
+                '桁数チェック
+                strErrCheck = fncKetaCheck(Trim(.Range("J" & strErrRow).Value), 8, ">")
+                If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・初度登録" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                Else
+                    '和暦チェック
+                    strErrCheck = fncWarekiCheck(Trim(.Range("J" & strErrRow).Value) & "1日", 6)
+                    If Not strErrCheck = "" Then
+                        strErrRowMsg = strErrRowMsg & "・初度登録" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                    Else
+                        '日付チェック
+                        strErrCheck = fncDateCheck(Trim(.Range("J" & strErrRow).Value), True, True)
+                        If Not strErrCheck = "" Then
+                            strErrRowMsg = strErrRowMsg & "・初度登録" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                        End If
+                    End If
+                End If
+            End If
+
+            ''車検満了日
+            If Not Trim(.Range("K" & strErrRow).Value) = "" Then
+                '桁数チェック
+                strErrCheck = fncKetaCheck(Trim(.Range("K" & strErrRow).Value), 11, ">")
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・車検満了日" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                Else
+                    '和暦チェック
+                    strErrCheck = fncWarekiCheck(Trim(.Range("K" & strErrRow).Value))
+                    If Not strErrCheck = "" Then
+                        strErrRowMsg = strErrRowMsg & "・車検満了日" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                    Else
+                        '日付チェック
+                        strErrCheck = fncDateCheck(Trim(.Range("K" & strErrRow).Value), True)
+                        If Not strErrCheck = "" Then
+                            strErrRowMsg = strErrRowMsg & "・車検満了日" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                        End If
+                    End If
+                End If
+            End If
+
+            ''改造・不明車
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("L" & strErrRow).Value, "AD2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・改造・不明車" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            End If
+            
+            ''排気量
+            If Not Trim(.Range("M" & strErrRow).Value) = "" Then
+                '数字チェック
+                strErrCheck = fncNumCheck(Trim(.Range("M" & strErrRow).Value), 1)
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・排気量" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                Else
+                    '桁数チェック
+                    strErrCheck = fncKetaCheck(Trim(.Range("M" & strErrRow).Value), 5, ">")
+                    If Not strErrCheck = "" Then
+                        strErrRowMsg = strErrRowMsg & "・排気量" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                    Else
+                        '数値チェック
+                        strErrCheck = fncNumRangeCheck(Val(Trim(.Range("M" & strErrRow).Value)), 0, 99.99)
+                        If Not strErrCheck = "" Then
+                            strErrRowMsg = strErrRowMsg & "・排気量" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                        End If
+                    End If
+                End If
+            End If
+            
+            ''2.5ﾘｯﾄﾙ超ﾃﾞｨｰｾﾞﾙ自小乗
+            If Not .Range("N" & strErrRow).Value = "" Then
+                '1またはブランクチェック
+                strErrCheck = fncOneOrBlankCheck(Val(.Range("N" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・2.5ﾘｯﾄﾙ超ﾃﾞｨｰｾﾞﾙ自小乗" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+            
+            '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+            ''被保険者生年月日
+            If Not Trim(.Range("O" & strErrRow).Value) = "" Then
+                '桁数チェック
+                strErrCheck = fncKetaCheck(Trim(.Range("O" & strErrRow).Value), 11, ">")
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・被保険者生年月日" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                Else
+                    '和暦チェック
+                    strErrCheck = fncWarekiCheck(Trim(.Range("O" & strErrRow).Value))
+                    If Not strErrCheck = "" Then
+                        strErrRowMsg = strErrRowMsg & "・被保険者生年月日" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                    Else
+                        '日付チェック
+                        strErrCheck = fncDateCheck(Trim(.Range("O" & strErrRow).Value), True)
+                        If Not strErrCheck = "" Then
+                            strErrRowMsg = strErrRowMsg & "・被保険者生年月日" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                        End If
+                    End If
+                End If
+            End If
+            
+            '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+            ''ノンフリート等級
+            '必須チェック
+            strErrCheck = fncNeedCheck(.Range("P" & strErrRow).Value)
+            If strErrCheck = "" Then
+                'リストチェック
+                strErrCheck = fncListCheck(.Range("P" & strErrRow).Value, "DM2")
+                If strErrCheck = "" Then
+                    '等級エラー１
+                    strErrCheck = fncToukyuCheck1(wsKyoutsu.Range("A2").Value, .Range("P" & strErrRow).Value)
+                    If strErrCheck = "" Then
+                        '等級エラー２
+                        strErrCheck = fncToukyuCheck2(wsKyoutsu.Range("A2").Value, .Range("P" & strErrRow).Value)
+                    End If
+                End If
+            End If
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・ノンフリート等級" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            End If
+            
+            '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+            ''事故有係数適用期間
+            '必須チェック
+            strErrCheck = fncNeedCheck(.Range("Q" & strErrRow).Value)
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・事故有係数適用期間" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            Else
+                'リストチェック
+                strErrCheck = fncListCheck(.Range("Q" & strErrRow).Value, "AL2")
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・事故有係数適用期間" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+            
+            '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+            ''ゴールド免許割引
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("R" & strErrRow).Value, "CT2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・ゴールド免許割引" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            End If
+            
+            '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+            ''使用目的
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("S" & strErrRow).Value, "DC2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・使用目的" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            End If
+            
+            '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+            ''年齢条件
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("T" & strErrRow).Value, "BB2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・年齢条件" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            End If
+            
+            '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+            ''高齢運転者対象外
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("U" & strErrRow).Value, "CW2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・高齢運転者対象外" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            End If
+            
+            '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+            ''運転者限定
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("V" & strErrRow).Value, "BF2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・運転者限定" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            End If
+
+            ''ASV割引
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("W" & strErrRow).Value, "CT2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・ASV割引" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            End If
+            
+            ''車両保険の種類
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("AG" & strErrRow).Value, "BJ2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・車両保険の種類" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                blnReltErrFlg = True
+            End If
+            
+            ''車両保険金額
+            If Not Trim(.Range("AH" & strErrRow).Value) = "" Then
+                '数字チェック
+                strErrCheck = fncNumCheck(Trim(.Range("AH" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・車両保険金額" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                    blnReltErrFlg = True
+                Else
+                    '桁数チェック
+                    strErrCheck = fncKetaCheck(Trim(.Range("AH" & strErrRow).Value), 5, ">")
+                    If Not strErrCheck = "" Then
+                        strErrRowMsg = strErrRowMsg & "・車両保険金額" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                        blnReltErrFlg = True
+                    End If
+                End If
+            End If
+                        
+            ''車両免責金額
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("AI" & strErrRow).Value, "BN2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・車両免責金額" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                blnReltErrFlg = True
+            End If
+            
+            ''車両全損臨費特約
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("AJ" & strErrRow).Value, "CT2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・車両全損臨費特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                blnReltErrFlg = True
+            End If
+            
+            ''車両超過修理費用特約
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("AK" & strErrRow).Value, "CT2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・車両超過修理費用特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                blnReltErrFlg = True
+            End If
+            
+            ''車両盗難対象外特約
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("AL" & strErrRow).Value, "CW2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・車両盗難対象外特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                blnReltErrFlg = True
+            End If
+            
+            '事故代車・身の回り品特約
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("BC" & strErrRow).Value, "CA2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・事故代車・身の回り品特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                blnReltErrFlg = True
+            End If
+            
+            ''○車両保険エラー
+            If blnReltErrFlg = False Then
+                strErrCheck = fncHknSyuruiCheck(.Range("AG" & strErrRow).Value, .Range("AI" & strErrRow).Value, _
+                                             .Range("BC" & strErrRow).Value, .Range("AJ" & strErrRow).Value, .Range("AL" & strErrRow).Value, _
+                                             .Range("AK" & strErrRow).Value, Trim(.Range("AH" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "○車両保険エラー" & vbCrLf
+                    strErrRowMsg = strErrRowMsg & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+                        
+            blnReltErrFlg = False
+                        
+            ''対人賠償
+            '必須チェック
+            strErrCheck = fncNeedCheck(.Range("AM" & strErrRow).Value)
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・対人賠償" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                blnReltJinErrFlg = True
+            Else
+                'リストチェック
+                strErrCheck = fncListCheck(.Range("AM" & strErrRow).Value, "CD2")
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・対人賠償" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                    blnReltJinErrFlg = True
+                End If
+            End If
+            
+            ''自損事故傷害特約
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("AN" & strErrRow).Value, "CW2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・自損事故傷害特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                blnReltJinErrFlg = True
+            End If
+            
+            ''無保険車事故傷害特約
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("AO" & strErrRow).Value, "CW2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・無保険車事故傷害特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                blnReltJinErrFlg = True
+            End If
+            
+            ''対物賠償
+            '必須チェック
+            strErrCheck = fncNeedCheck(.Range("AP" & strErrRow).Value)
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・対物賠償" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                blnReltErrFlg = True
+            Else
+                'リストチェック
+                strErrCheck = fncListCheck(.Range("AP" & strErrRow).Value, "CH2")
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・対物賠償" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                    blnReltErrFlg = True
+                End If
+            End If
+            
+            ''対物免責金額
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("AQ" & strErrRow).Value, "BR2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・対物免責金額" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                blnReltErrFlg = True
+            End If
+            
+            ''対物超過修理費用特約
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("AR" & strErrRow).Value, "CT2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・対物超過修理費用特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                blnReltErrFlg = True
+            End If
+            
+            If blnReltErrFlg = False Then
+                ''○対物賠償エラー
+                strErrCheck = fncTaibutsuBaisyo(.Range("AP" & strErrRow).Value, .Range("AQ" & strErrRow).Value, .Range("AR" & strErrRow).Value)
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "○対物賠償エラー" & vbCrLf
+                    strErrRowMsg = strErrRowMsg & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+            
+            blnReltErrFlg = False
+            
+            ''人身傷害(1名)
+            '必須チェック
+            strErrCheck = fncNeedCheck(.Range("AS" & strErrRow).Value)
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・人身傷害(1名)" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                blnReltJinErrFlg = True
+                blnReltErrFlg = True
+            Else
+                'リストチェック
+                strErrCheck = fncListCheck(.Range("AS" & strErrRow).Value, "CL2")
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・人身傷害(1名)" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                    blnReltJinErrFlg = True
+                    blnReltErrFlg = True
+                End If
+            End If
+            
+            If blnReltJinErrFlg = False Then
+                ''○対人賠償エラー
+                strErrCheck = fncTaijinBaisyoCheck(.Range("AM" & strErrRow).Value, .Range("AN" & strErrRow).Value, _
+                                                    .Range("AS" & strErrRow).Value, .Range("AO" & strErrRow).Value)
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "○対人賠償エラー" & vbCrLf
+                    strErrRowMsg = strErrRowMsg & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+            
+            ''人身傷害(1事故)
+            If Not Trim(.Range("AT" & strErrRow).Value) = "" Then
+                '数字チェック
+                strErrCheck = fncNumCheck(Trim(.Range("AT" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・人身傷害(1事故)" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                    blnReltErrFlg = True
+                Else
+                    '桁数チェック
+                    strErrCheck = fncKetaCheck(Trim(.Range("AT" & strErrRow).Value), 6, ">")
+                    If Not strErrCheck = "" Then
+                        strErrRowMsg = strErrRowMsg & "・人身傷害(1事故)" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                        blnReltErrFlg = True
+                    End If
+                End If
+            End If
+            
+            If blnReltErrFlg = False Then
+                ''○人身傷害エラー
+                strErrCheck = fncZinshinSyougai(.Range("AS" & strErrRow).Value, Trim(.Range("AT" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "○人身傷害エラー" & vbCrLf
+                    strErrRowMsg = strErrRowMsg & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+            
+            blnReltErrFlg = False
+            
+            '搭乗者傷害(1名)
+            Dim Taisyougai As String
+            If IsEmpty(Range("AU" & strErrRow).Value) Or Range("AU" & strErrRow).Value = "対象外" Then
+                Taisyougai = True
+'                Range("AU" & strErrRow).Value = "対象外"
+                Range("AU" & strErrRow).Value = Empty
+            Else
+                Taisyougai = False
+            End If
+
+            
+            ''搭乗者傷害(1事故)
+            If Not Trim(.Range("AV" & strErrRow).Value) = "" Then
+                '数字チェック
+                strErrCheck = fncNumCheck(Trim(.Range("AV" & strErrRow).Value))
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "・搭乗者傷害(1事故)" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                    blnReltErrFlg = True
+                Else
+                    '桁数チェック
+                    strErrCheck = fncKetaCheck(Trim(.Range("AV" & strErrRow).Value), 6, ">")
+                    If Not strErrCheck = "" Then
+                        strErrRowMsg = strErrRowMsg & "・搭乗者傷害(1事故)" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                        blnReltErrFlg = True
+                    End If
+                End If
+            End If
+            
+            ''日数払特約
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("AW" & strErrRow).Value, "CT2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・日数払特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                blnReltErrFlg = True
+            End If
+            
+            If blnReltErrFlg = False Then
+                ''○搭乗者傷害エラー
+                strErrCheck = fncTouzyouSyougai(.Range("AU" & strErrRow).Value, Taisyougai, _
+                                                 Trim(.Range("AV" & strErrRow).Value), .Range("AW" & strErrRow).Value)
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "○搭乗者傷害エラー" & vbCrLf
+                    strErrRowMsg = strErrRowMsg & strErrCheck & vbCrLf & vbCrLf
+                End If
+                If IsEmpty(Range("AU" & strErrRow).Value) Then
+                    Range("AU" & strErrRow).Value = "対象外"
+                End If
+            End If
+            
+            ''事業主費用特約
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("AX" & strErrRow).Value, "CT2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・事業主費用特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            End If
+            
+            ''弁護士費用特約
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("AY" & strErrRow).Value, "CT2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・弁護士費用特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            End If
+            
+            ''従業員等限定特約
+            'リストチェック
+'            strErrCheck = fncListCheck(.Range("AR" & strErrRow).Value, "CZ2")
+'            If Not strErrCheck = "" Then
+'                strErrRowMsg = strErrRowMsg & "・従業員等限定特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+'            End If
+
+            '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+            ''ファミリーバイク特約
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("AZ" & strErrRow).Value, "BV2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・ファミリーバイク特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            Else
+                strErrCheck = fncFamilyBikeCheck(.Range("AZ" & strErrRow).Value, .Range("AS" & strErrRow).Value)
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "○ファミリーバイク特約エラー" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+            
+            '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+            ''個人賠償責任補償特約
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("BA" & strErrRow).Value, "CT2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・個人賠償責任補償特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            End If
+            
+            '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+            ''自動車事故特約
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("BB" & strErrRow).Value, "CT2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・自動車事故特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            Else
+                strErrCheck = fncJidoushaJikoCheck(.Range("BB" & strErrRow).Value, .Range("AS" & strErrRow).Value)
+                If Not strErrCheck = "" Then
+                    strErrRowMsg = strErrRowMsg & "○自動車事故特約エラー" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+                End If
+            End If
+
+            ''車両搬送時不適用特約
+            'リストチェック
+            strErrCheck = fncListCheck(.Range("BD" & strErrRow).Value, "DQ2")
+            If Not strErrCheck = "" Then
+                strErrRowMsg = strErrRowMsg & "・車両搬送時不適用特約" & vbCrLf & strErrCheck & vbCrLf & vbCrLf
+            End If
+
+            ''エラー判定
+            If strErrRowMsg <> "" Then
+                blnErrFlg = True
+                strErrMsg = strErrMsg & "◆ " & fncFormatDigit(strErrRow, " ", 4) & " 行目" & _
+                            " （明細No " & fncFormatDigit(CStr(intCntLoop), " ", 3) & ")" & vbCrLf & Left(strErrRowMsg, Len(strErrRowMsg) - 2)
+                strErrMsg = strErrMsg & String(62, "-") & vbCrLf
+            End If
+            
+        Next rngChkAll
+        
+        Set rngChkAll = Nothing
+        
+        Call subMeisaiUnProtect     'シートの保護の解除
+        
+        'エラーチェック完了
+        wsMeisai.OLEObjects("txtErrMsg").Object.Value = strErrMsg & "チェック完了" & " [ " & Format(Time, "HH:MM:SS") & " ]"
+        wsMeisai.OLEObjects("txtErrMsg").Object.SelStart = 0
+        wsMeisai.OLEObjects("txtErrMsg").Activate
+        Dim a As Integer
+        a = txtErrMsg.Left
+        txtErrMsg.Left = 0
+        txtErrMsg.Left = a
+        
+        Call subMeisaiProtect       'シートの保護
+        
+    End With
+    
+    Set wsMeisai = Nothing
+    
+    On Error GoTo 0
+
+    If blnErrFlg Then
+        Exit Sub
+    Else
+        'テキストファイルの出力
+        blnDownloadflg = True
+        Call BtnTmpSave_Click
+    End If
+    
+    Exit Sub
+    
+Error:
+     MsgBox "btnDl_Click" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+
+End Sub
+
+
+'一時保存ボタン押下
+Private Sub BtnTmpSave_Click()
+    Dim strOutKyo       As String
+    Dim strOutMei       As String
+    Dim strOutput       As String
+    Dim intFileNumber   As Integer
+    Dim intFileMaxCar   As Integer
+    Dim strOuptutPath   As String
+    Dim blnOutFlg       As Boolean
+    
+    strOutput = ""
+    strOutKyo = ""
+    strOutMei = ""
+    intFileMaxCar = 0
+    blnOutFlg = False
+    
+    On Error GoTo Error
+    
+    'シート定義
+    Dim wsMeisai As Worksheet
+    '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    'Call subSetSheet(1, wsMeisai)       'シートオブジェクト(明細入力)
+    Call subSetSheet(17, wsMeisai)      'シートオブジェクト(明細入力（ノンフリート）)
+    
+    Dim wsSetting As Worksheet
+    Call subSetSheet(5, wsSetting)      'シートオブジェクト(別紙　各種設定)
+    
+    '総付保台数取得
+    Dim intAllCell As Integer
+    Dim objSouhuho As Object
+    Set objSouhuho = wsMeisai.OLEObjects("txtSouhuho").Object
+    intAllCell = Val(Left(objSouhuho.Value, Len(objSouhuho.Value) - 2))
+    
+    'ファイル総付保台数取得
+    intFileMaxCar = Val(wsSetting.Range("B3").Value)
+    
+    'テキストファイル出力パス取得
+    strOuptutPath = wsSetting.Range("B5").Value
+    
+    '出力ファイル名
+    Dim strFileName As String
+    Dim strFilePath As String
+    Dim strFileFullPath As String
+    Dim intFileNo As Integer
+    strFileName = Format(Now(), "YYYYMMDDhhmm")
+    
+    'ダウンロードまたは一時保存MSGBOX
+    If blnDownloadflg Then
+        intConfirmMsg = MsgBox("ダウンロードします。よろしいですか。", vbYesNo, "確認ダイアログ")
+    Else
+        intConfirmMsg = MsgBox("一時保存します。よろしいですか。", vbYesNo, "確認ダイアログ")
+    End If
+    
+    If intConfirmMsg = 7 Then
+    Else
+        Dim i As Integer
+        
+        '出力ファイルパス
+        If strOuptutPath = "" Then
+            strFilePath = CreateObject("WScript.Shell").SpecialFolders.item("Desktop") & "\"
+        Else
+            strFilePath = strOuptutPath & "\"
+        End If
+        If Not blnDownloadflg Then
+            strFilePath = strFilePath & "一時保存_"
+        End If
+        
+        If intAllCell < (intFileMaxCar + 1) Then
+        '明細が99件以下の場合
+            
+            '出力ファイル上書きチェック
+            strFileFullPath = strFilePath & strFileName & ".txt"
+            
+            '同名ファイル確認
+            If Dir(strFileFullPath) <> "" Then
+                intConfirmMsg = MsgBox("同じ名前のファイルが既に存在します。上書きしますか？", vbYesNo, "確認ダイアログ")
+                If intConfirmMsg = 7 Then Exit Sub
+            End If
+
+            '共通情報レコード（1行目）取得
+            strOutKyo = fncTempSave_Kyotsu(CStr(intAllCell))
+
+            '明細情報レコード（2行目）取得
+            For i = 1 To intAllCell
+                strOutMei = fncTempSave_NonFleetMeisai(i, strOutMei, blnOutFlg, blnDownloadflg)
+            Next
+
+            '1行目＋2行目を結合
+            strOutput = strOutKyo & Left(strOutMei, Len(strOutMei) - 2)
+
+            '出力
+            intFileNumber = FreeFile
+            Open strFileFullPath For Output As #intFileNumber
+                Print #intFileNumber, strOutput;
+            Close #intFileNumber
+
+            blnOutFlg = True
+        Else
+'        '明細が100件以上の場合
+'            intFileNo = 1
+'
+'            strFileFullPath = strFilePath & strFileName & "_" & Format(intFileNo, "00") & ".txt"
+'
+'            '同名ファイル確認
+'            If Dir(strFileFullPath) <> "" Then
+'                intConfirmMsg = MsgBox("同じ名前のファイルが既に存在します。上書きしますか？", vbYesNo, "確認ダイアログ")
+'                If intConfirmMsg = 7 Then Exit Sub
+'            End If
+'
+'            For i = 1 To intAllCell
+'
+'                '明細情報レコード（2行目）取得
+'                strOutMei = fncTempSave_Meisai(i, strOutMei, blnOutFlg, blnDownloadflg)
+'
+'                If i Mod intFileMaxCar = 0 Or i = intAllCell Then
+'                    '共通情報レコード（1行目）取得
+'                    strOutKyo = fncTempSave_Kyotsu(IIf(i Mod intFileMaxCar = 0, intFileMaxCar, i Mod intFileMaxCar))
+'
+'                    '1行目＋2行目を結合
+'                    strOutput = strOutKyo + strOutMei
+'
+'                    strFileFullPath = strFilePath & strFileName & "_" & Format(intFileNo, "00") & ".txt"
+'
+'                    '出力
+'                    intFileNumber = FreeFile
+'                    Open strFileFullPath For Output As #intFileNumber
+'                        Print #intFileNumber, strOutput;
+'                    Close #intFileNumber
+'
+'                    intFileNo = intFileNo + 1
+'
+'                    blnOutFlg = True
+'                End If
+'            Next
+        End If
+
+        If blnDownloadflg Then
+            MsgBox "ダウンロードが完了しました。", vbOKOnly, "通知ダイアログ"
+
+            '明細入力画面のエラー用リスト初期化
+            wsMeisai.OLEObjects("txtErrMsg").Object.Value = ""
+            wsMeisai.OLEObjects("txtErrMsg").Activate
+            wsMeisai.OLEObjects("btnDl").Activate
+        Else
+            MsgBox "一時保存が完了しました。", vbOKOnly, "通知ダイアログ"
+        End If
+        
+        Set wsMeisai = Nothing
+        Set wsSetting = Nothing
+        Set objSouhuho = Nothing
+        
+    End If
+    
+    blnDownloadflg = False
+    
+    On Error GoTo 0
+    
+    Exit Sub
+
+Error:
+     MsgBox "BtnTmpSave_Click" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+
+End Sub
+
+
+'クリアボタン押下
+Private Sub CmdClearAll_Click()
+    
+    On Error GoTo Error
+    
+    Call subMeisaiUnProtect     'シートの保護の解除
+    Call subClearAll            '明細チェックのチェックをすべて解除
+    Call subMeisaiProtect       'シートの保護
+    
+    On Error GoTo 0
+    
+    Exit Sub
+    
+Error:
+     MsgBox "CmdClearAll_Click" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+    
+End Sub
+
+
+'セットボタン押下
+Private Sub CmdSetCode_Click()
+    
+    Dim lngMaxMeisai As Long
+    
+    On Error GoTo Error
+
+    '「明細入力」シート
+    Dim wsMeisai As Worksheet
+    '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    'Call subSetSheet(1, wsMeisai)       'シートオブジェクト(明細入力)
+    Call subSetSheet(17, wsMeisai)      'シートオブジェクト(明細入力（ノンフリート）)
+    
+    '総付保台数
+    Dim objSouhuho As Object
+    Set objSouhuho = wsMeisai.OLEObjects("txtSouhuho").Object
+    lngMaxMeisai = Val(Left(objSouhuho.Value, Len(objSouhuho.Value) - 2))
+    
+    '「コード値」シート
+    Dim wsCode As Worksheet
+    Dim lngMaxCol As Long
+    '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    'Call subSetSheet(4, wsCode)         'シートオブジェクト(別紙　コード値)
+    Call subSetSheet(16, wsCode)         'シートオブジェクト(別紙　コード値（ノンフリート））
+
+    lngMaxCol = wsCode.Cells(wsCode.Rows.Count, wsCode.Range("Z2").Column).End(xlUp).Row
+    
+    Call subMeisaiUnProtect     'シートの保護の解除
+    
+    Dim i As Long
+    Dim j As Long
+    
+    'クリア
+    For i = 0 To lngMaxMeisai - 1
+        wsMeisai.Cells(21 + i, 4) = ""
+    Next i
+    
+    'セット
+    For i = 0 To lngMaxMeisai - 1
+        For j = 0 To lngMaxCol - 1
+            If wsMeisai.Cells(21 + i, 3) = wsCode.Cells(3 + j, 26) Then
+                wsMeisai.Cells(21 + i, 4) = wsCode.Cells(3 + j, 27)
+                Exit For
+            End If
+        Next j
+    Next i
+    
+'    '明細入力画面のエラー用リスト初期化
+'    wsMeisai.OLEObjects("txtErrMsg").Object.Value = ""
+'    wsMeisai.OLEObjects("txtErrMsg").Activate
+'    wsMeisai.OLEObjects("CmdSetCode").Activate
+    
+    Set wsMeisai = Nothing
+    Set objSouhuho = Nothing
+    Set wsCode = Nothing
+    
+    Call subMeisaiProtect       'シートの保護
+    
+    On Error GoTo 0
+
+    Exit Sub
+    
+Error:
+     MsgBox "CmdSetCode_Click" & vbCrLf & _
+            "エラー番号:" & Err.Number & vbCrLf & _
+            "エラーの種類:" & Err.Description, vbExclamation, "予期せぬエラー"
+
+End Sub
+
+
+'選択ボタン押下
+Private Sub CmdOtherRate1_Click()
+    'シート・ブックの非表示
+    Call subSheetVisible(False)
+    
+    frmOtherrate.Show vbModeless
+End Sub
+
+
+Function ColStr2Num(ByVal colStr As String) As Long
+    Dim colNum As Long
+    Dim i As Long
+ 
+     colNum = 0
+ 
+    For i = 1 To Len(colStr)
+        colNum = colNum * 26 + (Asc(UCase(Mid(colStr, i, 1))) - 64)
+    Next
+    
+    ColStr2Num = colNum
+
+End Function
+
+'Private Sub txtErrMsg_GotFocus()
+'    txtErrMsg.Visible = False
+'    txtErrMsg.Visible = True
+'End Sub
+
+Private Sub txtErrMsg_KeyUp(ByVal KeyCode As MSForms.ReturnInteger, ByVal Shift As Integer)
+    Dim i As Integer
+    i = txtErrMsg.Left
+    txtErrMsg.Left = 0
+    txtErrMsg.Left = i
+End Sub
+
+Private Sub txtErrMsg_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    Dim i As Integer
+    i = txtErrMsg.Left
+    txtErrMsg.Left = 0
+    txtErrMsg.Left = i
+End Sub
+
+Private Sub Worksheet_Change(ByVal Target As Range)
+    Dim wsMeisai As Worksheet           '明細入力ワークシート
+    Dim strFinalCol As String              'シートの最終列
+    
+    '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+    'Call subSetSheet(1, wsMeisai)       'シートオブジェクト(明細入力)
+    'strFinalCol = "AV21"
+    Call subSetSheet(17, wsMeisai)       'シートオブジェクト(明細入力（ノンフリート）)
+    strFinalCol = "BF21"
+    
+    If Not Application.Intersect(Target, wsMeisai.Range(wsMeisai.Range("C21"), wsMeisai.Range(strFinalCol).End(xlDown))) Is Nothing Then
+
+        Dim blnProtect As Boolean
+
+        If wsMeisai.ProtectContents Then
+            blnProtect = True
+        End If
+
+        If blnProtect Then
+            Call subMeisaiUnProtect         'シートの保護の解除
+        End If
+
+        Application.ScreenUpdating = False   '描画停止
+
+        ''フォント
+        '表示形式
+        If Not Target.NumberFormatLocal = "@" Then
+            Target.NumberFormatLocal = "@"
+        End If
+        'ハイパーリンク
+        If Target.Hyperlinks.Count > 0 Then
+            Target.Hyperlinks.Delete
+        End If
+        'スタイル
+        If Not Target.Font.Name = "MS Pゴシック" Then
+            Target.Font.Name = "MS Pゴシック"
+        End If
+        'サイズ
+        If Not Target.Font.Size = 8 Then
+            Target.Font.Size = 8
+        End If
+        '色
+        If Not Target.Font.Color = False Then
+            Target.Font.Color = False
+        End If
+        '太字
+        If Not Target.Font.Bold = False Then
+            Target.Font.Bold = False
+        End If
+        '斜体
+        If Not Target.Font.Italic = False Then
+            Target.Font.Italic = False
+        End If
+        '下線
+        If Not Target.Font.Underline = xlUnderlineStyleNone Then
+            Target.Font.Underline = xlUnderlineStyleNone
+        End If
+        '取り消し線
+        If Not Target.Font.Strikethrough = False Then
+            Target.Font.Strikethrough = False
+        End If
+        '上付き
+        If Not Target.Font.Superscript = False Then
+            Target.Font.Superscript = False
+        End If
+        '下付き
+        If Not Target.Font.Subscript = False Then
+            Target.Font.Subscript = False
+        End If
+
+        ''罫線
+        '上端
+        If Not Target.Borders(xlEdgeTop).LineStyle = xlContinuous Then
+            Target.Borders(xlEdgeTop).LineStyle = xlContinuous
+        End If
+        '上端_太さ
+        If Not Target.Borders(xlEdgeTop).Weight = xlThin Then
+            Target.Borders(xlEdgeTop).Weight = xlThin
+        End If
+        '上端_色
+        If Not Target.Borders(xlEdgeTop).Color = 0 Then
+            Target.Borders(xlEdgeTop).Color = 0
+        End If
+        '下端
+        If Not Target.Borders(xlEdgeBottom).LineStyle = xlContinuous Then
+            Target.Borders(xlEdgeBottom).LineStyle = xlContinuous
+        End If
+        '下端_太さ
+        If Not Target.Borders(xlEdgeBottom).Weight = xlThin Then
+            Target.Borders(xlEdgeBottom).Weight = xlThin
+        End If
+        '下端_色
+        If Not Target.Borders(xlEdgeBottom).Color = 0 Then
+            Target.Borders(xlEdgeBottom).Color = 0
+        End If
+        '右端
+        If Not Target.Borders(xlEdgeRight).LineStyle = xlContinuous Then
+            Target.Borders(xlEdgeRight).LineStyle = xlContinuous
+        End If
+        '右端_太さ
+        If Not Target.Borders(xlEdgeRight).Weight = xlThin Then
+            Target.Borders(xlEdgeRight).Weight = xlThin
+        End If
+        '右端_色
+        If Not Target.Borders(xlEdgeRight).Color = 0 Then
+            Target.Borders(xlEdgeRight).Color = 0
+        End If
+        '左端
+        If Not Target.Borders(xlEdgeLeft).LineStyle = xlContinuous Then
+            Target.Borders(xlEdgeLeft).LineStyle = xlContinuous
+        End If
+        '左端_太さ
+        If Not Target.Borders(xlEdgeLeft).Weight = xlThin Then
+            Target.Borders(xlEdgeLeft).Weight = xlThin
+        End If
+        '左端_色
+        If Not Target.Borders(xlEdgeLeft).Color = 0 Then
+            Target.Borders(xlEdgeLeft).Color = 0
+        End If
+        '内側横
+        If Not Target.Borders(xlInsideHorizontal).LineStyle = xlContinuous Then
+            Target.Borders(xlInsideHorizontal).LineStyle = xlContinuous
+        End If
+        '内側横_太さ
+        If Not Target.Borders(xlInsideHorizontal).Weight = xlThin Then
+            Target.Borders(xlInsideHorizontal).Weight = xlThin
+        End If
+        '内側横_色
+        If Not Target.Borders(xlInsideHorizontal).Color = 0 Then
+            Target.Borders(xlInsideHorizontal).Color = 0
+        End If
+        '内側縦
+        If Not Target.Borders(xlInsideVertical).LineStyle = xlContinuous Then
+            Target.Borders(xlInsideVertical).LineStyle = xlContinuous
+        End If
+        '内側縦_太さ
+        If Not Target.Borders(xlInsideVertical).Weight = xlThin Then
+            Target.Borders(xlInsideVertical).Weight = xlThin
+        End If
+        '内側縦_色
+        If Not Target.Borders(xlInsideVertical).Color = 0 Then
+            Target.Borders(xlInsideVertical).Color = 0
+        End If
+        '右下がり斜線
+        If Not Target.Borders(xlDiagonalDown).LineStyle = xlLineStyleNone Then
+            Target.Borders(xlDiagonalDown).LineStyle = xlLineStyleNone
+        End If
+        '右上がり斜線
+        If Not Target.Borders(xlDiagonalUp).LineStyle = xlLineStyleNone Then
+            Target.Borders(xlDiagonalUp).LineStyle = xlLineStyleNone
+        End If
+
+        If blnProtect Then
+            Call subMeisaiProtect           'シートの保護
+        End If
+
+        '用途車種が変更された場合、コード値をクリア
+        If Not Application.Intersect(Target, wsMeisai.Range(wsMeisai.Range("C21"), wsMeisai.Range("C21").End(xlDown))) Is Nothing Then
+            Call subMeisaiUnProtect             'シートの保護を解除
+            Application.EnableEvents = False    'イベント禁止
+
+            Dim wsCode As Worksheet
+            '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
+            'Call subSetSheet(4, wsCode)         'シートオブジェクト(別紙　コード値)
+            Call subSetSheet(16, wsCode)         'シートオブジェクト(別紙　コード値（ノンフリート））
+
+            Dim lngMaxCol As Long
+            lngMaxCol = wsCode.Cells(wsCode.Rows.Count, wsCode.Range("Z2").Column).End(xlUp).Row
+
+            Dim i As Long
+            Dim j As Long
+            Dim blnCodeFlg As Boolean
+
+            'コードを初期化する必要があるか判定
+            For i = 0 To lngMaxCol - 1
+                If wsMeisai.Cells(Target.Row, 3) = wsCode.Cells(3 + i, 26) Then
+                    If wsMeisai.Cells(Target.Row, 4) = wsCode.Cells(3 + i, 27) Then
+                        blnCodeFlg = True
+                        Exit For
+                    End If
+                    Exit For
+                End If
+            Next i
+
+            If blnCodeFlg Then
+            Else
+                wsMeisai.Range("D" & Target.Row) = ""
+            End If
+
+            Application.EnableEvents = True     'イベント再開
+            Call subMeisaiProtect               'シートの保護
+        End If
+
+    End If
+
+    Set wsMeisai = Nothing
+
+End Sub
+

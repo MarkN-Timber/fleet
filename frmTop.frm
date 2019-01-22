@@ -208,7 +208,7 @@ End Sub
 'クリアボタン押下
 Private Sub BtnPathDelete_Click()
     '選択されているパスをテキストから削除
-    With txtFilePath
+    With TxtFilePath
         .Value = ""
         
         .SetFocus
@@ -230,19 +230,19 @@ Private Sub BtnFileSelect_Click()
     'テキストボックス出力用に、TXTファイルパスを変換
     If IsArray(varTxtPath) Then
 
-        If txtFilePath.Value <> "" Then
-            txtFilePath.Value = txtFilePath.Value & vbCrLf
+        If TxtFilePath.Value <> "" Then
+            TxtFilePath.Value = TxtFilePath.Value & vbCrLf
         End If
 
         'ファイルパスをテキストに格納
         For Each varFilePath In varTxtPath
-            txtFilePath.Value = txtFilePath.Value & varFilePath & vbCrLf
+            TxtFilePath.Value = TxtFilePath.Value & varFilePath & vbCrLf
         Next varFilePath
 
-        txtFilePath.Value = Left(txtFilePath.Value, Len(txtFilePath.Value) - 2)
+        TxtFilePath.Value = Left(TxtFilePath.Value, Len(TxtFilePath.Value) - 2)
 
-        txtFilePath.SetFocus
-        txtFilePath.SelStart = 0
+        TxtFilePath.SetFocus
+        TxtFilePath.SelStart = 0
 
     End If
 
@@ -274,9 +274,9 @@ Private Sub BtnReuse_Click()
     
     On Error GoTo Error
 
-    If (txtFilePath.Value) = "" Then Exit Sub
+    If (TxtFilePath.Value) = "" Then Exit Sub
 
-    varFiles = Split(txtFilePath.Value, vbCrLf)
+    varFiles = Split(TxtFilePath.Value, vbCrLf)
 
     ReDim varFilePath(UBound(varFiles), 0)
 

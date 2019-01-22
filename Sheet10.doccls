@@ -170,9 +170,9 @@ Private Sub CmdSyasyuSet_Click()
         Set wbWorkBook = Nothing
 
         'フォーム設定
-        frmSyaryou.txtFilePath = strFilePath
+        frmSyaryou.TxtFilePath = strFilePath
         'frmSyaryou.txtFilePath.SetFocus '2018/3 ﾉﾝﾌﾘｰﾄ明細付機能追加
-        frmSyaryou.txtFilePath.SelStart = 0
+        frmSyaryou.TxtFilePath.SelStart = 0
         frmSyaryou.lblMaxMeisai = "総付保台数：" & strMaxMeisai & "台"
         frmSyaryou.lblMaxRow = "取込台数：" & CStr(lngMaxRow - 1) & "台"
         frmSyaryou.Show vbModeless

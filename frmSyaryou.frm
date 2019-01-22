@@ -38,7 +38,7 @@ Private Sub btnSelect_Click()
     On Error GoTo Error
     
     '選択されていたファイルのパス・ファイル名を取得
-    strBeforeFilePath = frmSyaryou.txtFilePath
+    strBeforeFilePath = frmSyaryou.TxtFilePath
     strBeforeFileName = Mid(strBeforeFilePath, InStrRev(strBeforeFilePath, "\") + 1)
     
     'ファイル選択ダイアログ
@@ -90,9 +90,9 @@ Private Sub btnSelect_Click()
         Set wsWorkSheet = Nothing
         
         'フォーム設定
-        frmSyaryou.txtFilePath = strFilePath
-        frmSyaryou.txtFilePath.SetFocus
-        frmSyaryou.txtFilePath.SelStart = 0
+        frmSyaryou.TxtFilePath = strFilePath
+        frmSyaryou.TxtFilePath.SetFocus
+        frmSyaryou.TxtFilePath.SelStart = 0
         frmSyaryou.lblMaxRow = "取込台数：" & CStr(lngMaxRow - 1) & "台"
     
     End If
@@ -138,7 +138,7 @@ Private Sub btnSyaryouSet_Click()
         Dim strFilePath As String
         Dim strFileName As String
         
-        strFilePath = frmSyaryou.txtFilePath
+        strFilePath = frmSyaryou.TxtFilePath
         
         strFileName = Mid(strFilePath, InStrRev(strFilePath, "\") + 1)
         
@@ -153,7 +153,7 @@ Private Sub btnSyaryouSet_Click()
         If blnFileFlg Then
             Set wbWorkBook = Workbooks(strFileName)
         Else
-            Set wbWorkBook = Workbooks.Open(txtFilePath)
+            Set wbWorkBook = Workbooks.Open(TxtFilePath)
             Windows(wbWorkBook.Name).Visible = False
             
             Call subFileClose(strBeforeFileName)
@@ -235,7 +235,7 @@ Private Sub BtnBack_Click()
     
     Dim strFileName As String
 
-    strFileName = Mid(frmSyaryou.txtFilePath, InStrRev(frmSyaryou.txtFilePath, "\") + 1)
+    strFileName = Mid(frmSyaryou.TxtFilePath, InStrRev(frmSyaryou.TxtFilePath, "\") + 1)
     If intMsgBox = 6 Then
         
         If Windows(strFileName).Visible = False Then
@@ -267,7 +267,7 @@ Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
         If intConfirmMsg = 6 Then
             Dim strFileName As String
             
-            strFileName = Mid(frmSyaryou.txtFilePath, InStrRev(frmSyaryou.txtFilePath, "\") + 1)
+            strFileName = Mid(frmSyaryou.TxtFilePath, InStrRev(frmSyaryou.TxtFilePath, "\") + 1)
             If Windows(strFileName).Visible = False Then
                 subFileClose (strFileName)
             End If

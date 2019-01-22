@@ -270,12 +270,6 @@ Function fncTextEdit(ByVal intKbn As Integer, ByVal intKoumoku As Integer, ByVal
                     strSave = CStr(.Cells(3, i))
                     .Cells(4, i) = CStr(Format(strSave, "eemmdd"))
                     
-                    '帳票用変換3 新元号対応
-                    .Cells(5, i) = fncToSeireki(strSave, 11, True)
-                    
-                    '帳票用変換4 新元号対応
-                    .Cells(6, i) = Mid(fncToSeireki(strSave, 8), 3)
-                    
                 Case 7  '保険始期時刻区分
                     'テキスト貼り付け
                     .Cells(1, i) = strContent
@@ -305,12 +299,6 @@ Function fncTextEdit(ByVal intKbn As Integer, ByVal intKoumoku As Integer, ByVal
                     strSave = CStr(.Cells(3, i))
                     .Cells(4, i) = CStr(Format(strSave, "eemmdd"))
                     
-                    '帳票用変換3 新元号対応
-                    .Cells(5, i) = fncToSeireki(strSave, 11, True)
-                    
-                    '帳票用変換4 新元号対応
-                    .Cells(6, i) = Mid(fncToSeireki(strSave, 8), 3)
-
                 Case 10 '計算方法
                     'テキスト貼り付け
                     .Cells(1, i) = strContent
@@ -549,17 +537,6 @@ Function fncTextEdit(ByVal intKbn As Integer, ByVal intKoumoku As Integer, ByVal
                     '.Cells(3 * Val(wsTextK.Cells(1, 19)) + j, i) = CStr(Format(strSave, "emmdd"))
                     .Cells(3 * Val(wsTextK.Cells(1, 19)) + j, i) = CStr(Format(strSave, "eemm"))
                     
-                    '帳票用変換3 新元号対応
-                    strSave = fncToWareki(CStr(.Cells(j, i)) & "25", 8)
-                    .Cells(4 * Val(wsTextK.Cells(1, 19)) + j, i) = fncToSeireki(strSave, 8, True)
-                    
-                    '帳票用変換4 新元号対応
-                    If strSave Like "嗚呼*年*月" Then
-                        .Cells(5 * Val(wsTextK.Cells(1, 19)) + j, i) = "A" & CStr(Format("平成" & Mid(strSave, 3), "eemm"))
-                    Else
-                        .Cells(5 * Val(wsTextK.Cells(1, 19)) + j, i) = CStr(Format(strSave, "geemm"))
-                    End If
-                    
                 Case 7  '改造・不明車
                     'テキスト貼り付け
                     .Cells(j, i) = strContent
@@ -602,16 +579,7 @@ Function fncTextEdit(ByVal intKbn As Integer, ByVal intKoumoku As Integer, ByVal
                     .Cells(2 * Val(wsTextK.Cells(1, 19)) + j, i) = strSave
                     
                     '帳票用変換2
-'                    .Cells(3 * Val(wsTextK.Cells(1, 19)) + j, i) = CStr(Format(strSave, "geemmdd"))
-                    '新元号対応
-                    If strSave Like "嗚呼*年*月*日" Then
-                        .Cells(3 * Val(wsTextK.Cells(1, 19)) + j, i) = "A" & CStr(Format("平成" & Mid(strSave, 3), "eemmdd"))
-                    Else
-                        .Cells(3 * Val(wsTextK.Cells(1, 19)) + j, i) = CStr(Format(strSave, "geemmdd"))
-                    End If
-                    
-                    '帳票用変換3 新元号対応
-                    .Cells(4 * Val(wsTextK.Cells(1, 19)) + j, i) = fncToSeireki(strSave, 11, True, True)
+                    .Cells(3 * Val(wsTextK.Cells(1, 19)) + j, i) = CStr(Format(strSave, "geemmdd"))
                     
                 Case 11 'ノンフリート等級
                     'テキスト貼り付け
@@ -1990,13 +1958,7 @@ Public Sub subFormSetting(ByVal intChohyo As Integer, ByVal intFormNo As Integer
                                             valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, CStr(wsTextMP.Cells(6 + intSame, 5)), strBehind)
                                         
                                         Case 9 '車検満了日
-'                                           valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, Format(CStr(wsTextMP.Cells(6 + intSame, 6)), "eemmdd"), strBehind)
-                                            '新元号対応
-                                            If wsTextMP.Cells(6 + intSame, 6) Like "嗚呼*年*月*日" Then
-                                                valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = "A" & fncUnionString(strFront, Format("平成" & Mid(CStr(wsTextMP.Cells(6 + intSame, 6)), 3), "eemmdd"), strBehind)
-                                            Else
-                                                valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, Format(CStr(wsTextMP.Cells(6 + intSame, 6)), "geemmdd"), strBehind)
-                                            End If
+                                                valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, Format(CStr(wsTextMP.Cells(6 + intSame, 6)), "eemmdd"), strBehind)
                                     End Select
                                     
                                 
@@ -2027,9 +1989,7 @@ Public Sub subFormSetting(ByVal intChohyo As Integer, ByVal intFormNo As Integer
                                             End If
                                         
                                         Case 5 '免許証有効期限
-'                                            valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, Format(CStr(wsTextMP.Cells(6 + intSame, 27)), "eemmdd"), strBehind)
-                                            '新元号対応
-                                            valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncToSeireki(CStr(wsTextMP.Cells(6 + intSame, 27)), 8)
+                                            valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, Format(CStr(wsTextMP.Cells(6 + intSame, 27)), "eemmdd"), strBehind)
                                         
                                         Case 6 '登録番号（漢字）
                                             valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, CStr(wsTextMP.Cells(18 + intSame, 3)), strBehind)
@@ -2041,14 +2001,8 @@ Public Sub subFormSetting(ByVal intChohyo As Integer, ByVal intFormNo As Integer
                                             valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, CStr(wsTextMP.Cells(18 + intSame, 8)), strBehind)
                                         
                                         Case 9 '車検満了日
-'                                            valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, Format(CStr(wsTextMP.Cells(18 + intSame, 9)), "eemmdd"), strBehind)
-                                            '新元号対応
-                                            If wsTextMP.Cells(18 + intSame, 9) Like "嗚呼*年*月*日" Then
-                                                valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = "A" & fncUnionString(strFront, Format("平成" & Mid(CStr(wsTextMP.Cells(18 + intSame, 9)), 3), "eemmdd"), strBehind)
-                                            Else
-                                                valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, Format(CStr(wsTextMP.Cells(18 + intSame, 9)), "geemmdd"), strBehind)
-                                            End If
-                                                
+                                                valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, Format(CStr(wsTextMP.Cells(18 + intSame, 9)), "eemmdd"), strBehind)
+                                        
                                         Case 10 '車両所有者氏名（カナ）
                                             valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, StrConv(CStr(wsTextMP.Cells(18 + intSame, 16)), vbKatakana + vbNarrow), strBehind)
                                         
@@ -2083,14 +2037,10 @@ Public Sub subFormSetting(ByVal intChohyo As Integer, ByVal intFormNo As Integer
                                             valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, CStr(wsTextMP.Cells(30 + intSame, 9)), strBehind)
                                         
                                         Case 19 '保険始期日
-'                                            valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, Format(CStr(wsTextMP.Cells(30 + intSame, 10)), "eemmdd"), strBehind)
-                                            '新元号対応
-                                            valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncToSeireki(CStr(wsTextMP.Cells(30 + intSame, 10)), 8)
+                                            valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, Format(CStr(wsTextMP.Cells(30 + intSame, 10)), "eemmdd"), strBehind)
                                         
                                         Case 20 '保険終期日
-                                            '新元号対応
-'                                            valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, Format(CStr(wsTextMP.Cells(30 + intSame, 17)), "eemmdd"), strBehind)
-                                            valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncToSeireki(CStr(wsTextMP.Cells(30 + intSame, 17)), 8)
+                                            valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, Format(CStr(wsTextMP.Cells(30 + intSame, 17)), "eemmdd"), strBehind)
                                         
                                         Case 21 '3等級ダウン事故
                                             valEdpSet(intEdpKbn - 1, 2, intEdpIndex - 1) = fncUnionString(strFront, CStr(wsTextMP.Cells(30 + intSame, 24)), strBehind)
@@ -2556,8 +2506,6 @@ Public Sub subFormSetting(ByVal intChohyo As Integer, ByVal intFormNo As Integer
                                     wsChohyo.Range(strCell) = fncUnionString(strFront, fncToWareki(CStr(Left(strDate, Len(strDate) - 4)), 11), strBehind)
                                 ElseIf intType = 4 Then
                                     wsChohyo.Range(strCell) = fncUnionString(strFront, CStr(strDate) & " - " & CStr(Format((intPageCnt + 1), "0000")), strBehind)
-                                ElseIf intType = 5 Then
-                                    wsChohyo.Range(strCell) = fncUnionString(strFront, fncToSeireki(fncToWareki(CStr(Left(strDate, Len(strDate) - 4)), 11), 11, True), strBehind)
                                 End If
                             End If
                         Case 2  '明細番号

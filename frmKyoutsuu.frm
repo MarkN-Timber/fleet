@@ -199,8 +199,7 @@ Public Sub UserForm_Initialize()
         Next
 
         '保険始期日
-'        txtHokenStart_Nen = Format(Val(Left(varSaveContent(4), 4)) - 1988, "00")
-        txtHokenStart_Nen = Format(Val(Left(varSaveContent(4), 4)) - 2000, "00") '新元号対応
+        txtHokenStart_Nen = Format(Val(Left(varSaveContent(4), 4)) - 1988, "00")
         txtHokenStart_Tsuki = Mid(varSaveContent(4), 5, 2)
         txtHokenStart_Hi = Right(varSaveContent(4), 2)
 
@@ -295,8 +294,7 @@ Private Sub btnNext_Click()
     End If
 
     '保険期間
-'    wsMeisai.Range("B3") = "　保険期間　　：平成" & Format(Trim(txtHokenStart_Nen), "00") & "年" & Format(Trim(txtHokenStart_Tsuki), "00") & "月" & Format(Trim(txtHokenStart_Hi), "00") & "日から1年間"
-    wsMeisai.Range("B3") = "　保険期間　　：20" & Format(Trim(txtHokenStart_Nen), "00") & "年" & Format(Trim(txtHokenStart_Tsuki), "00") & "月" & Format(Trim(txtHokenStart_Hi), "00") & "日から1年間"
+    wsMeisai.Range("B3") = "　保険期間　　：平成" & Format(Trim(txtHokenStart_Nen), "00") & "年" & Format(Trim(txtHokenStart_Tsuki), "00") & "月" & Format(Trim(txtHokenStart_Hi), "00") & "日から1年間"
     '受付区分
     wsMeisai.Range("E3") = "　受付区分　　：" & cmbUketsukekbn
     '被保険者
@@ -413,8 +411,7 @@ Private Sub subSaveData(ByRef strSaveData As String)
         strSaveData = strSaveData & "" & "/"
     End If
     '保険始期日年月日
-'    strSaveData = strSaveData & Format(Val(Trim(txtHokenStart_Nen)) + 1988, "0000") & Format(Trim(txtHokenStart_Tsuki), "00") & Format(Trim(txtHokenStart_Hi), "00") & "/"
-    strSaveData = strSaveData & Format(Val(Trim(txtHokenStart_Nen)) + 2000, "0000") & Format(Trim(txtHokenStart_Tsuki), "00") & Format(Trim(txtHokenStart_Hi), "00") & "/"
+    strSaveData = strSaveData & Format(Val(Trim(txtHokenStart_Nen)) + 1988, "0000") & Format(Trim(txtHokenStart_Tsuki), "00") & Format(Trim(txtHokenStart_Hi), "00") & "/"
     strSaveData = strSaveData & "1" & "/"
     strSaveData = strSaveData & "0" & "/"
     If cmbHaraiHouhou.ListIndex > -1 Then
@@ -636,24 +633,9 @@ Private Function fncEntryCheckKyotsu(ByRef strErrContent As String)
     '保険始期日_年月日
     strErrChkMsg = ""
     strErrKoumoku = "・保険始期日" & vbCrLf
-    '新元号対応↓
-'    If strHokenStartErrMsg = "" Then
-'        strHokenStart = Format(Trim(txtHokenStart_Nen) + 1988, "0000") & "/" & _
-'                        Format(Trim(txtHokenStart_Tsuki), "00") & "/" & _
-'                        Format(Trim(txtHokenStart_Hi), "00")
-'        strErrChkMsg = fncDateCheck(strHokenStart)                              '日付チェック
-'
-'        If strErrChkMsg = "" Then
-'            strErrChkMsg = fncShikiCheck(strHokenStart)                              '保険始期チェック
-'        End If
-'        If strErrChkMsg = "" Then
-'        Else
-'            strErrContent = strErrContent & strErrKoumoku & strErrChkMsg & vbCrLf & vbCrLf
-'        End If
-'
-'    End If
+
     If strHokenStartErrMsg = "" Then
-        strHokenStart = Format(Trim(txtHokenStart_Nen) + 2000, "0000") & "/" & _
+        strHokenStart = Format(Trim(txtHokenStart_Nen) + 1988, "0000") & "/" & _
                         Format(Trim(txtHokenStart_Tsuki), "00") & "/" & _
                         Format(Trim(txtHokenStart_Hi), "00")
         strErrChkMsg = fncDateCheck(strHokenStart)                              '日付チェック
@@ -667,7 +649,7 @@ Private Function fncEntryCheckKyotsu(ByRef strErrContent As String)
         End If
 
     End If
-    '新元号対応↑
+
     '払込方法
     strErrChkMsg = ""
 
@@ -854,5 +836,3 @@ Private Function fncFleetTasuuCheck(ByVal strFleetKbn As String, ByVal blnTasuuW
     End If
     
 End Function
-
-

@@ -251,12 +251,9 @@ Public Function fncToWareki(ByVal strDate As String, ByVal intKeta As Integer) A
                     strWareki = "昭和"
                     intSaveDate = intSaveDate - 1925
                 
-                ElseIf CDate(strSaveDate) >= "1989/01/08" And CDate(strSaveDate) <= "2019/04/30" Then
+                ElseIf CDate(strSaveDate) >= "1989/01/08" Then
                     strWareki = "平成"
                     intSaveDate = intSaveDate - 1988
-                ElseIf CDate(strSaveDate) >= "2019/05/01" Then
-                    strWareki = "嗚呼"
-                    intSaveDate = intSaveDate - 2018
                 End If
                 
                 fncToWareki = strWareki & CStr(intSaveDate) & "年" & Format(CDate(strSaveDate), "mm") & "月" & Format(CDate(strSaveDate), "dd") & "日"
@@ -276,54 +273,27 @@ End Function
 
 
 '和暦→西暦　変換
-Public Function fncToSeireki(ByVal strDate As String, ByVal intKeta As Date, Optional ByVal blnNengappiflg As Boolean, Optional ByVal blnMaezeroflg As Boolean) As String
+Public Function fncToSeireki(ByVal strDate As String, ByVal intKeta As Date) As String
     Dim intSaveDate    As Integer
-    If strDate Like "*年*月*日" Then
-        If strDate Like "*元年*" Then
-            strDate = Left(strDate, InStr(strDate, "元") - 1) & "1" & Mid(strDate, InStr(strDate, "元") + 1)
-        End If
-        
-        intSaveDate = Mid(strDate, 3, InStr(strDate, "年") - 3)
-        
-        If Left(strDate, 2) = "大正" Then
-            intSaveDate = intSaveDate + 1911
-        ElseIf Left(strDate, 2) = "昭和" Then
-            intSaveDate = intSaveDate + 1925
-        ElseIf Left(strDate, 2) = "平成" Then
-            intSaveDate = intSaveDate + 1988
-        ElseIf Left(strDate, 2) = "嗚呼" Then '新元号対応
-            intSaveDate = intSaveDate + 2018
-        End If
-        
-'        If intKeta = 6 Then
-'            strDate = CStr(intSaveDate) & Mid(strDate, InStr(strDate, "年")) '新元号対応
-'            fncToSeireki = CStr(intSaveDate) & Format(strDate, "mm")
-'        Else
-'            strDate = CStr(intSaveDate) & Mid(strDate, InStr(strDate, "年")) '新元号対応
-'            fncToSeireki = CStr(intSaveDate) & Format(strDate, "mm") & Format(strDate, "dd")
-'        End If
-        If blnNengappiflg Then
-            If intKeta = 8 Then
-                strDate = CStr(intSaveDate) & Mid(strDate, InStr(strDate, "年")) '新元号対応
-                fncToSeireki = CStr(intSaveDate) & "年" & Format(strDate, "m") & "月"
-            ElseIf intKeta = 11 Then
-                If blnMaezeroflg Then
-                    strDate = CStr(intSaveDate) & Mid(strDate, InStr(strDate, "年")) '新元号対応
-                    fncToSeireki = CStr(intSaveDate) & "年" & Format(strDate, "mm") & "月" & Format(strDate, "dd") & "日"
-                Else
-                    strDate = CStr(intSaveDate) & Mid(strDate, InStr(strDate, "年")) '新元号対応
-                    fncToSeireki = CStr(intSaveDate) & "年" & Format(strDate, "m") & "月" & Format(strDate, "d") & "日"
-                End If
-            End If
-        Else
-            If intKeta = 6 Then
-                strDate = CStr(intSaveDate) & Mid(strDate, InStr(strDate, "年")) '新元号対応
-                fncToSeireki = CStr(intSaveDate) & Format(strDate, "mm")
-            Else
-                strDate = CStr(intSaveDate) & Mid(strDate, InStr(strDate, "年")) '新元号対応
-                fncToSeireki = CStr(intSaveDate) & Format(strDate, "mm") & Format(strDate, "dd")
-            End If
-        End If
+    
+    If strDate Like "*元年*" Then
+        strDate = Left(strDate, InStr(strDate, "元") - 1) & "1" & Mid(strDate, InStr(strDate, "元") + 1)
+    End If
+    
+    intSaveDate = Mid(strDate, 3, InStr(strDate, "年") - 3)
+    
+    If Left(strDate, 2) = "大正" Then
+        intSaveDate = intSaveDate + 1911
+    ElseIf Left(strDate, 2) = "昭和" Then
+        intSaveDate = intSaveDate + 1925
+    ElseIf Left(strDate, 2) = "平成" Then
+        intSaveDate = intSaveDate + 1988
+    End If
+    
+    If intKeta = 6 Then
+        fncToSeireki = CStr(intSaveDate) & Format(strDate, "mm")
+    Else
+        fncToSeireki = CStr(intSaveDate) & Format(strDate, "mm") & Format(strDate, "dd")
     End If
     
 End Function

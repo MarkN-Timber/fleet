@@ -1138,7 +1138,7 @@ Public Function fncTempSave_NonFleetMeisai(ByRef intCarCnt As Integer, ByVal str
     '       –Æ‹–Ø‚ÌF
             strMeisai = strMeisai & fncFindName(fncTrimComma(.Cells(strTmpRow, 24).Value), "DT") & ","
     '       –Æ‹–Ø—LŒøŠúŒÀ
-            strDate = fncDateCheck(.Cells(strTmpRow, 27), False)
+            strDate = fncDateCheck(.Cells(strTmpRow, 27), True)
             If strDate = "" Then
                 strMeisai = strMeisai & fncToSeireki(fncTrimComma(.Cells(strTmpRow, 27)), 8) & ","
             Else

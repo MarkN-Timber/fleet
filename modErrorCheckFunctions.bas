@@ -42,90 +42,67 @@ Public Function fncDateCheck(ByVal strValue As String, Optional blnWareki As Boo
 '        strValue       = 入力内容
 '        blnWareki      = 和暦フラグ
     If blnWareki Then
-    Dim strSeireki As String
-        If strValue Like "*元年*" Then
-            strValue = Left(strValue, InStr(strValue, "元") - 1) & "1" & Mid(strValue, InStr(strValue, "元") + 1)
-        End If
-        '新元号対応↓
-        If IsNumeric(Mid(strValue, 3, InStr(strValue, "年") - 3)) And _
-        IsNumeric(Mid(strValue, InStr(strValue, "年") + 1, InStr(strValue, "月") - InStr(strValue, "年") - 1)) And _
-        (Mid(strValue, InStr(strValue, "年") + 1, InStr(strValue, "月") - InStr(strValue, "年") - 1)) >= 1 And _
-        (Mid(strValue, InStr(strValue, "年") + 1, InStr(strValue, "月") - InStr(strValue, "年") - 1)) <= 12 Then
-            If blnSyodoTouroku Then
-                If strValue Like "大正*年*月" Then
-                    If strValue Like "*7月*" Then
-                        strValue = strValue & "30日"
-                    ElseIf strValue Like "*12月*" Then
-                        strValue = strValue & "24日"
-                    Else
-                        strValue = strValue & "1日"
-                    End If
-                ElseIf strValue Like "昭和*年*月" Then
-                    If strValue Like "*12月*" Then
-                        strValue = strValue & "25日"
-                    ElseIf strValue Like "*1月*" Then
-                        strValue = strValue & "7日"
-                    Else
-                        strValue = strValue & "1日"
-                    End If
-                ElseIf strValue Like "平成*" Then
-                    If strValue Like "*1月*" Then
-                        strValue = strValue & "8日"
-                    ElseIf strValue Like "*4月*" Then
-                        strValue = strValue & "30日"
-                    Else
-                        strValue = strValue & "1日"
-                    End If
-                ElseIf strValue Like "嗚呼*" Then
+
+        If blnSyodoTouroku Then
+            If strValue Like "大正*" Then
+                If strValue Like "*7月*" Then
+                    strValue = strValue & "30日"
+                ElseIf strValue Like "*12月*" Then
+                    strValue = strValue & "24日"
+                Else
                     strValue = strValue & "1日"
+                End If
+            ElseIf strValue Like "昭和*" Then
+                If strValue Like "*12月*" Then
+                    strValue = strValue & "25日"
+                ElseIf strValue Like "*1月*" Then
+                    strValue = strValue & "7日"
+                Else
+                    strValue = strValue & "1日"
+                End If
+            ElseIf strValue Like "平成*" Then
+                If strValue Like "*1月*" Then
+                    strValue = strValue & "8日"
+                Else
+                    strValue = strValue & "1日"
+                End If
+            End If
+        End If
+
+        If IsDate(strValue) = False Then
+            fncDateCheck = " 年月日を確認のうえ、正しく入力してください。"
+        Else
+            fncDateCheck = ""
+        End If
+
+        If fncDateCheck = "" Then
+            If strValue Like "*元年*" Then
+                strValue = Left(strValue, InStr(strValue, "元") - 1) & "1" & Mid(strValue, InStr(strValue, "元") + 1)
+            End If
+
+            If strValue Like "大正*" Then
+                If CDate(strValue) >= CDate("1912/07/30") And _
+                   CDate(strValue) <= CDate("1926/12/24") Then
+                    fncDateCheck = ""
+                Else
+                    fncDateCheck = " 年月日を確認のうえ、正しく入力してください。"
+                End If
+            ElseIf strValue Like "昭和*" Then
+                If CDate(strValue) >= CDate("1926/12/25") And _
+                   CDate(strValue) <= CDate("1989/01/07") Then
+                    fncDateCheck = ""
+                Else
+                    fncDateCheck = " 年月日を確認のうえ、正しく入力してください。"
+                End If
+            ElseIf strValue Like "平成*" Then
+                If CDate(strValue) >= "1989/01/08" Then
+                    fncDateCheck = ""
                 Else
                     fncDateCheck = " 年月日を確認のうえ、正しく入力してください。"
                 End If
             End If
-
-            If IsNumeric(Mid(strValue, InStr(strValue, "月") + 1, InStr(strValue, "日") - InStr(strValue, "月") - 1)) Then
-                If fncDateCheck = "" Then
-                    If strValue Like "大正*年*月*日" Then
-                        If CDate(strValue) >= CDate("1912/07/30") And _
-                           CDate(strValue) <= CDate("1926/12/24") Then
-                            fncDateCheck = ""
-                        Else
-                            fncDateCheck = " 年月日を確認のうえ、正しく入力してください。"
-                        End If
-                    ElseIf strValue Like "昭和*年*月*日" Then
-                        If CDate(strValue) >= CDate("1926/12/25") And _
-                           CDate(strValue) <= CDate("1989/01/07") Then
-                            fncDateCheck = ""
-                        Else
-                            fncDateCheck = " 年月日を確認のうえ、正しく入力してください。"
-                        End If
-                    ElseIf strValue Like "平成*年*月*日" Then
-                        If CDate(strValue) >= CDate("1989/01/08") And _
-                           CDate(strValue) <= CDate("2019/04/30") Then
-                            fncDateCheck = ""
-                        Else
-                            fncDateCheck = " 年月日を確認のうえ、正しく入力してください。"
-                        End If
-                    ElseIf strValue Like "嗚呼*年*月*日" Then
-                        strSeireki = Mid(strValue, 3, InStr(strValue, "年") - 3)
-                        strSeireki = strSeireki + 2018 & Mid(strValue, InStr(strValue, "年"))
-                        If CDate(strSeireki) >= CDate("2019/05/01") Then
-'                        If fncToSeireki(strValue, 8) >= CDate("2019/05/01") Then
-                            fncDateCheck = ""
-                        Else
-                            fncDateCheck = " 年月日を確認のうえ、正しく入力してください。"
-                        End If
-                    Else
-                        fncDateCheck = " 年月日を確認のうえ、正しく入力してください。"
-                    End If
-                End If
-            Else
-                fncDateCheck = " 年月日を確認のうえ、正しく入力してください。"
-            End If
-        Else
-            fncDateCheck = " 年月日を確認のうえ、正しく入力してください。"
         End If
-        '新元号対応↑
+
     Else
         If IsDate(strValue) = False Then
             fncDateCheck = " 年月日を確認のうえ、正しく入力してください。"
@@ -392,8 +369,6 @@ Public Function fncWarekiCheck(ByVal strValue As String, Optional intKeta As Int
     ElseIf strValue Like "昭和*年*月*日" Then
         fncWarekiCheck = ""
     ElseIf strValue Like "平成*年*月*日" Then
-        fncWarekiCheck = ""
-    ElseIf strValue Like "嗚呼*年*月*日" Then
         fncWarekiCheck = ""
     Else
         If intKeta = 6 Then
@@ -710,6 +685,4 @@ Public Function fncToukyuCheck2(ByVal strUketsukeKbn As String, ByVal strNonFlee
         fncToukyuCheck2 = ""
     End If
 End Function
-
-
 

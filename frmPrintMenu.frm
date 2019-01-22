@@ -13,6 +13,7 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
+
 Option Explicit
 
 Dim intConfirmMsg As Integer
@@ -108,8 +109,7 @@ Private Sub BtnShisan_Click()
     Call subMeisaiUnProtect     'シートの保護の解除
 
     '保険期間
-'    wsMeisai.Range("B3") = "　保険期間　　：" & IIf(wsKyoutsu.Range("E2") = "", "", ("平成" & Format(CStr(Val(Left(wsKyoutsu.Range("E2"), 4)) - 1988), "00") & "年" & Mid(wsKyoutsu.Range("E2"), 5, 2) & "月" & Right(wsKyoutsu.Range("E2"), 2) & "日から1年間"))
-    wsMeisai.Range("B3") = "　保険期間　　：" & IIf(wsKyoutsu.Range("E2") = "", "", ("20" & Format(CStr(Val(Left(wsKyoutsu.Range("E2"), 4)) - 2000), "00") & "年" & Mid(wsKyoutsu.Range("E2"), 5, 2) & "月" & Right(wsKyoutsu.Range("E2"), 2) & "日から1年間"))
+    wsMeisai.Range("B3") = "　保険期間　　：" & IIf(wsKyoutsu.Range("E2") = "", "", ("平成" & Format(CStr(Val(Left(wsKyoutsu.Range("E2"), 4)) - 1988), "00") & "年" & Mid(wsKyoutsu.Range("E2"), 5, 2) & "月" & Right(wsKyoutsu.Range("E2"), 2) & "日から1年間"))
     '受付区分
     wsMeisai.Range("E3") = "　受付区分　　：" & fncFindCode(wsKyoutsu.Range("A2"), "C")
     '被保険者
@@ -408,6 +408,7 @@ Private Sub BtnMoushikomi_Click()
             wsMeisai.Rows(j).Hidden = True          '明細非表示
         Next j
         
+        
         'テキストファイルより12項目をセット
         intStarRow = 18    '車両情報は19行目から27行目
         For i = 1 To intSoufuho
@@ -415,7 +416,7 @@ Private Sub BtnMoushikomi_Click()
             wsMeisai.Cells(6 + i, 8) = StrConv(StrConv(wsTextM.Cells(i, 76), vbKatakana), vbNarrow) ''被保険者氏名（ｶﾅ）
             wsMeisai.Cells(6 + i, 11) = wsTextM.Cells(i, 77)                            ''被保険者氏名（漢字）
             wsMeisai.Cells(6 + i, 24) = fncFindCode(wsTextM.Cells(i, 78), "DU")         ''免許証の色
-            wsMeisai.Cells(6 + i, 27) = fncToSeireki(wsTextM.Cells((intSoufuho * 2) + i, 79), 11, True)       ''免許証有効期限
+            wsMeisai.Cells(6 + i, 27) = wsTextM.Cells((intSoufuho * 2) + i, 79)                            ''免許証有効期限
             wsMeisai.Cells(intStarRow + i, 3) = wsTextM.Cells(i, 69)                    '' 登録番号（漢字）（C列＝3番目）
             wsMeisai.Cells(intStarRow + i, 6) = wsTextM.Cells(i, 72)                    '' 登録番号（カナ）（F列＝6番目）
             wsMeisai.Cells(intStarRow + i, 8) = wsTextM.Cells(i, 70)                    '' 車台番号　　　　（H列＝8番目）
@@ -500,7 +501,5 @@ Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
     End If
     
 End Sub
-
-
 
 

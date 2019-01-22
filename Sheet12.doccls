@@ -265,15 +265,10 @@ Private Sub BtnPrintMoushikomi_Click()
             ActiveSheet.Name = "契約申込書1枚目WK"
             .Worksheets("契約申込書1枚目").Visible = False
             
-'            .Worksheets("契約申込書2枚目").Visible = True
-'            .Worksheets("契約申込書2枚目").Copy After:=.Worksheets(.Worksheets.Count)
-'            ActiveSheet.Name = "契約申込書2枚目WK"
-'            .Worksheets("契約申込書2枚目").Visible = False
-            '新元号対応
-            .Worksheets("契約申込書2枚目(ノンフリート)").Visible = True
-            .Worksheets("契約申込書2枚目(ノンフリート)").Copy After:=.Worksheets(.Worksheets.Count)
+            .Worksheets("契約申込書2枚目").Visible = True
+            .Worksheets("契約申込書2枚目").Copy After:=.Worksheets(.Worksheets.Count)
             ActiveSheet.Name = "契約申込書2枚目WK"
-            .Worksheets("契約申込書2枚目(ノンフリート)").Visible = False
+            .Worksheets("契約申込書2枚目").Visible = False
             
             .Worksheets("明細書（ノンフリート）").Visible = True
             .Worksheets("明細書（ノンフリート）").Copy After:=.Worksheets(.Worksheets.Count)
